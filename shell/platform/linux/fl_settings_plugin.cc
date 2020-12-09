@@ -4,6 +4,7 @@
 
 #include "flutter/shell/platform/linux/fl_settings_plugin.h"
 
+#include <gtk/gtk.h>
 #include <cstring>
 
 #include "flutter/shell/platform/linux/public/flutter_linux/fl_basic_message_channel.h"
@@ -15,12 +16,14 @@ static constexpr char kAlwaysUse24HourFormatKey[] = "alwaysUse24HourFormat";
 static constexpr char kPlatformBrightnessKey[] = "platformBrightness";
 static constexpr char kPlatformBrightnessLight[] = "light";
 static constexpr char kPlatformBrightnessDark[] = "dark";
+static constexpr char kSystemFontFamilyKey[] = "systemFontFamily";
 
 static constexpr char kDesktopInterfaceSchema[] = "org.gnome.desktop.interface";
 static constexpr char kDesktopGtkThemeKey[] = "gtk-theme";
 static constexpr char kDesktopTextScalingFactorKey[] = "text-scaling-factor";
 static constexpr char kDesktopClockFormatKey[] = "clock-format";
 static constexpr char kClockFormat24Hour[] = "24h";
+static constexpr char kDesktopFontNameKey[] = "font-name";
 
 struct _FlSettingsPlugin {
   GObject parent_instance;
@@ -37,6 +40,7 @@ static void update_settings(FlSettingsPlugin* self) {
   gdouble scaling_factor = 1.0;
   gboolean always_use_24hr = FALSE;
   const gchar* platform_brightness = kPlatformBrightnessLight;
+  g_autofree gchar* font_family = nullptr;
 
   if (self->interface_settings != nullptr) {
     scaling_factor = g_settings_get_double(self->interface_settings,
@@ -53,6 +57,14 @@ static void update_settings(FlSettingsPlugin* self) {
         g_strcmp0(gtk_theme, "Adwaita-dark") == 0) {
       platform_brightness = kPlatformBrightnessDark;
     }
+
+    font_family =
+        g_settings_get_string(self->interface_settings, kDesktopFontNameKey);
+    // Remove size if present, e.g. 'Ubuntu 11'.
+    gchar* c = strrchr(font_family, ' ');
+    if (c != nullptr) {
+      *c = '\0';
+    }
   }
 
   g_autoptr(FlValue) message = fl_value_new_map();
@@ -62,6 +74,10 @@ static void update_settings(FlSettingsPlugin* self) {
                            fl_value_new_bool(always_use_24hr));
   fl_value_set_string_take(message, kPlatformBrightnessKey,
                            fl_value_new_string(platform_brightness));
+  if (font_family != nullptr) {
+    fl_value_set_string_take(message, kSystemFontFamilyKey,
+                             fl_value_new_string(font_family));
+  }
   fl_basic_message_channel_send(self->channel, message, nullptr, nullptr,
                                 nullptr);
 }
@@ -111,6 +127,9 @@ void fl_settings_plugin_start(FlSettingsPlugin* self) {
                               G_CALLBACK(update_settings), self,
                               G_CONNECT_SWAPPED);
       g_signal_connect_object(self->interface_settings, "changed::gtk-theme",
+                              G_CALLBACK(update_settings), self,
+                              G_CONNECT_SWAPPED);
+      g_signal_connect_object(self->interface_settings, "changed::font-name",
                               G_CALLBACK(update_settings), self,
                               G_CONNECT_SWAPPED);
     }

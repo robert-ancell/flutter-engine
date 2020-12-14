@@ -11,6 +11,7 @@
 #include "flutter/shell/platform/linux/fl_binary_messenger_private.h"
 #include "flutter/shell/platform/linux/fl_dart_project_private.h"
 #include "flutter/shell/platform/linux/fl_engine_private.h"
+#include "flutter/shell/platform/linux/fl_navigation_plugin.h"
 #include "flutter/shell/platform/linux/fl_plugin_registrar_private.h"
 #include "flutter/shell/platform/linux/fl_renderer.h"
 #include "flutter/shell/platform/linux/fl_renderer_headless.h"
@@ -30,6 +31,7 @@ struct _FlEngine {
   FlDartProject* project;
   FlRenderer* renderer;
   FlBinaryMessenger* binary_messenger;
+  FlNavigationPlugin* navigation_plugin;
   FlutterEngineAOTData aot_data;
   FLUTTER_API_SYMBOL(FlutterEngine) engine;
   FlutterEngineProcTable embedder_api;
@@ -315,6 +317,7 @@ static void fl_engine_dispose(GObject* object) {
   g_clear_object(&self->project);
   g_clear_object(&self->renderer);
   g_clear_object(&self->binary_messenger);
+  g_clear_object(&self->navigation_plugin);
 
   if (self->platform_message_handler_destroy_notify) {
     self->platform_message_handler_destroy_notify(
@@ -337,6 +340,7 @@ static void fl_engine_init(FlEngine* self) {
   FlutterEngineGetProcAddresses(&self->embedder_api);
 
   self->binary_messenger = fl_binary_messenger_new(self);
+  self->navigation_plugin = fl_navigation_plugin_new(self->binary_messenger);
 }
 
 FlEngine* fl_engine_new(FlDartProject* project, FlRenderer* renderer) {

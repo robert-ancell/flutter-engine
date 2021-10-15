@@ -40,6 +40,10 @@ static void fl_task_runner_process_expired_tasks_locked(FlTaskRunner* self) {
   while (l != nullptr) {
     FlTaskRunnerTask* task = static_cast<FlTaskRunnerTask*>(l->data);
     if (task->task_time_micros <= current_time) {
+      guint64 delay = (current_time - task->task_time_micros) / 1000;
+      if (delay > 5) {
+        g_printerr("task delay=%lims\n", delay);
+      }
       GList* link = l;
       l = l->next;
       self->pending_tasks = g_list_remove_link(self->pending_tasks, link);
@@ -54,7 +58,13 @@ static void fl_task_runner_process_expired_tasks_locked(FlTaskRunner* self) {
   l = expired_tasks;
   while (l != nullptr && self->engine) {
     FlTaskRunnerTask* task = static_cast<FlTaskRunnerTask*>(l->data);
+    gint64 start_time = g_get_monotonic_time();
     fl_engine_execute_task(self->engine, &task->task);
+    gint64 end_time = g_get_monotonic_time();
+    gint64 task_duration = (end_time - start_time) / 1000;
+    if (task_duration > 5) {
+      g_printerr("task duration=%lims\n", task_duration);
+    }
     l = l->next;
   }
 

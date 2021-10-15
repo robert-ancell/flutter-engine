@@ -6,6 +6,8 @@
 
 #include <epoxy/gl.h>
 
+extern gint64 queue_time;
+
 struct _FlGLArea {
   GtkWidget parent_instance;
 
@@ -78,6 +80,15 @@ static void fl_gl_area_size_allocate(GtkWidget* widget,
 static gboolean fl_gl_area_draw(GtkWidget* widget, cairo_t* cr) {
   FlGLArea* self = FL_GL_AREA(widget);
 
+  gint64 start_time = g_get_monotonic_time();
+  if (queue_time != -1) {
+    gint64 queue_delay = (start_time - queue_time) / 1000;
+    if (queue_delay > 5) {
+      g_printerr("queue delay=%lims\n", queue_delay);
+    }
+  }
+  queue_time = -1;
+
   gdk_gl_context_make_current(self->context);
 
   gint scale = gtk_widget_get_scale_factor(widget);
@@ -91,6 +102,12 @@ static gboolean fl_gl_area_draw(GtkWidget* widget, cairo_t* cr) {
                            GL_TEXTURE, scale, geometry.x, geometry.y,
                            geometry.width, geometry.height);
     gdk_gl_context_make_current(self->context);
+  }
+
+  gint64 end_time = g_get_monotonic_time();
+  gint64 task_duration = (end_time - start_time) / 1000;
+  if (task_duration > 5) {
+    g_printerr("draw duration=%lims\n", task_duration);
   }
 
   return TRUE;

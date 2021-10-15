@@ -24,6 +24,8 @@
 
 static constexpr int kMicrosecondsPerMillisecond = 1000;
 
+gint64 queue_time = -1;
+
 struct _FlView {
   GtkContainer parent_instance;
 
@@ -841,6 +843,7 @@ void fl_view_end_frame(FlView* view) {
 
   gtk_container_forall(GTK_CONTAINER(view), fl_view_reorder_forall, &data);
 
+  queue_time = g_get_monotonic_time();
   gtk_widget_queue_draw(GTK_WIDGET(view));
 }
 

@@ -6,7 +6,7 @@
 
 static void dispose_origin_from_gdk_event(gpointer origin) {
   g_return_if_fail(origin != nullptr);
-  gdk_event_free(reinterpret_cast<GdkEvent*>(origin));
+  g_object_unref(reinterpret_cast<GObject*>(origin));
 }
 
 FlKeyEvent* fl_key_event_new_from_gdk_event(GdkEvent* event) {
@@ -22,6 +22,8 @@ FlKeyEvent* fl_key_event_new_from_gdk_event(GdkEvent* event) {
   gdk_event_get_keyval(event, &keyval);
   GdkModifierType state = static_cast<GdkModifierType>(0);
   gdk_event_get_state(event, &state);
+  guint group = 0;
+  gdk_event_get_key_group(event, &group);
 
   result->time = gdk_event_get_time(event);
   result->is_press = type == GDK_KEY_PRESS;
@@ -29,7 +31,7 @@ FlKeyEvent* fl_key_event_new_from_gdk_event(GdkEvent* event) {
   result->keyval = keyval;
   result->state = state;
   result->string = g_strdup(event->key.string);
-  result->group = event->key.group;
+  result->group = group;
   result->origin = event;
   result->dispose_origin = dispose_origin_from_gdk_event;
 

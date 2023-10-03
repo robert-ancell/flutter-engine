@@ -363,11 +363,7 @@ static gboolean button_press_event_cb(GtkWidget* widget,
   GdkEvent* event = reinterpret_cast<GdkEvent*>(button_event);
 
   // Flutter doesn't handle double and triple click events.
-  GdkEventType event_type = gdk_event_get_event_type(event);
-  if (event_type == GDK_DOUBLE_BUTTON_PRESS ||
-      event_type == GDK_TRIPLE_BUTTON_PRESS) {
-    return FALSE;
-  }
+  GdkEventType event_type = gdk_event_get_event_type(event);  // FIXME: Kill
 
   check_pointer_inside(self, event);
 
@@ -450,7 +446,7 @@ static gboolean leave_notify_event_cb(GtkWidget* widget,
   gdouble event_x = 0.0, event_y = 0.0;
   gdk_event_get_coords(event, &event_x, &event_y);
 
-  if (crossing_event->mode != GDK_CROSSING_NORMAL) {
+  if (event->mode != GDK_CROSSING_NORMAL) {
     return FALSE;
   }
 

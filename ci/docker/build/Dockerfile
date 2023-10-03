@@ -77,7 +77,8 @@ RUN apt-get install -y \
     libegl1-mesa       \
     libgles2-mesa-dev  \
     libglu1-mesa-dev   \
-    libgtk-3-dev       \
+    libgtk-4-dev       \
+    libvulkan-dev      \
     libx11-dev         \
     mesa-common-dev    \
     xvfb

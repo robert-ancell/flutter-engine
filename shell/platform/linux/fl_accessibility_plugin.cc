@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 #include "flutter/shell/platform/linux/fl_accessibility_plugin.h"
-#include "flutter/shell/platform/linux/fl_view_accessible.h"
+//#include "flutter/shell/platform/linux/fl_view_accessible.h"
 
 struct _FlAccessibilityPlugin {
   GObject parent_instance;
@@ -50,7 +50,7 @@ void fl_accessibility_plugin_handle_update_semantics_node(
     return;
   }
 
-  AtkObject* accessible = gtk_widget_get_accessible(GTK_WIDGET(self->view));
-  fl_view_accessible_handle_update_semantics_node(
-      FL_VIEW_ACCESSIBLE(accessible), node);
+  //AtkObject* accessible = gtk_widget_get_accessible(GTK_WIDGET(self->view));
+  //fl_view_accessible_handle_update_semantics_node(
+  //    FL_VIEW_ACCESSIBLE(accessible), node);
 }

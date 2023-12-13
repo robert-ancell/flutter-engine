@@ -7,8 +7,6 @@
 
 #include "flutter/shell/platform/linux/public/flutter_linux/fl_view.h"
 
-#include "flutter/shell/platform/linux/fl_gl_area.h"
-
 /**
  * fl_view_set_textures:
  * @view: an #FlView.

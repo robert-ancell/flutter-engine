@@ -8,7 +8,6 @@
 
 #include <cstring>
 
-#include "flutter/shell/platform/linux/fl_accessibility_plugin.h"
 #include "flutter/shell/platform/linux/fl_engine_private.h"
 #include "flutter/shell/platform/linux/fl_key_event.h"
 #include "flutter/shell/platform/linux/fl_keyboard_view_delegate.h"
@@ -43,7 +42,7 @@ struct _FlView {
   //GdkWindowState window_state;
 
   // Flutter system channel handlers.
-  FlAccessibilityPlugin* accessibility_plugin;
+  //FlAccessibilityPlugin* accessibility_plugin;
   FlTextInputPlugin* text_input_plugin;
   FlMouseCursorPlugin* mouse_cursor_plugin;
   FlPlatformPlugin* platform_plugin;
@@ -55,7 +54,7 @@ struct _FlView {
 
   /* FlKeyboardViewDelegate related properties */
   KeyboardLayoutNotifier keyboard_layout_notifier;
-  GdkKeymap* keymap;
+  //GdkKeymap* keymap;
   gulong keymap_keys_changed_cb_id;  // Signal connection ID for
                                      // keymap-keys-changed
   gulong window_state_cb_id;  // Signal connection ID for window-state-changed
@@ -103,10 +102,10 @@ static gboolean window_delete_event_cb(GtkWidget* widget,
 static void update_semantics_node_cb(FlEngine* engine,
                                      const FlutterSemanticsNode* node,
                                      gpointer user_data) {
-  FlView* self = FL_VIEW(user_data);
+  //FlView* self = FL_VIEW(user_data);
 
-  fl_accessibility_plugin_handle_update_semantics_node(
-      self->accessibility_plugin, node);
+  //fl_accessibility_plugin_handle_update_semantics_node(
+  //    self->accessibility_plugin, node);
 }
 
 // Invoked by the engine right before the engine is restarted.
@@ -177,8 +176,8 @@ static void fl_view_keyboard_delegate_iface_init(
 
   iface->lookup_key = [](FlKeyboardViewDelegate* view_delegate,
                          const GdkKeymapKey* key) -> guint {
-    FlView* self = FL_VIEW(view_delegate);
-    g_return_val_if_fail(self->keymap != nullptr, 0);
+    //FlView* self = FL_VIEW(view_delegate);
+    //g_return_val_if_fail(self->keymap != nullptr, 0);
     return 0;//gdk_keymap_lookup_key(self->keymap, key);
   };
 
@@ -263,7 +262,7 @@ static void fl_view_constructed(GObject* object) {
 
   // Create system channel handlers.
   FlBinaryMessenger* messenger = fl_engine_get_binary_messenger(self->engine);
-  self->accessibility_plugin = fl_accessibility_plugin_new(self);
+  //self->accessibility_plugin = fl_accessibility_plugin_new(self);
   self->mouse_cursor_plugin = fl_mouse_cursor_plugin_new(messenger, self);
   self->platform_plugin = fl_platform_plugin_new(messenger);
 
@@ -309,7 +308,7 @@ static void fl_view_dispose(GObject* object) {
   g_clear_object(&self->project);
   g_clear_object(&self->renderer);
   g_clear_object(&self->engine);
-  g_clear_object(&self->accessibility_plugin);
+  //g_clear_object(&self->accessibility_plugin);
   g_clear_object(&self->mouse_cursor_plugin);
   g_clear_object(&self->platform_plugin);
 

@@ -99,6 +99,9 @@ extern const intptr_t kPlatformStrongDillSize;
 #include "third_party/skia/include/gpu/ganesh/vk/GrVkBackendSurface.h"
 #endif  // SHELL_ENABLE_VULKAN
 
+#include <GL/gl.h>
+#include <EGL/egl.h>
+
 const int32_t kFlutterSemanticsNodeIdBatchEnd = -1;
 const int32_t kFlutterSemanticsCustomActionIdBatchEnd = -1;
 
@@ -2063,6 +2066,10 @@ FlutterEngineResult FlutterEngineRunInitialized(
     return LOG_EMBEDDER_ERROR(kInvalidArguments, "Engine handle was invalid.");
   }
 
+  fprintf(stderr, "FlutterEngineRunInitialized %p\n", eglGetCurrentContext());
+
+  fprintf(stderr, "RI1. GL_VERSION='%s'\n", glGetString(GL_VERSION));
+
   auto embedder_engine = reinterpret_cast<flutter::EmbedderEngine*>(engine);
 
   // The engine must not already be running. Initialize may only be called
@@ -2071,18 +2078,24 @@ FlutterEngineResult FlutterEngineRunInitialized(
     return LOG_EMBEDDER_ERROR(kInvalidArguments, "Engine handle was invalid.");
   }
 
+  fprintf(stderr, "RI2. GL_VERSION='%s'\n", glGetString(GL_VERSION));   
+
   // Step 1: Launch the shell.
-  if (!embedder_engine->LaunchShell()) {
+  if (!embedder_engine->LaunchShell()) { // FAILS IN HERE
     return LOG_EMBEDDER_ERROR(kInvalidArguments,
                               "Could not launch the engine using supplied "
                               "initialization arguments.");
   }
 
+  fprintf(stderr, "RI3. GL_VERSION='%s'\n", glGetString(GL_VERSION));
+
   // Step 2: Tell the platform view to initialize itself.
-  if (!embedder_engine->NotifyCreated()) {
+  if (!embedder_engine->NotifyCreated()) { // context lost
     return LOG_EMBEDDER_ERROR(kInternalInconsistency,
                               "Could not create platform view components.");
   }
+
+  fprintf(stderr, "RI4. GL_VERSION='%s'\n", glGetString(GL_VERSION));
 
   // Step 3: Launch the root isolate.
   if (!embedder_engine->RunRootIsolate()) {
@@ -2091,6 +2104,8 @@ FlutterEngineResult FlutterEngineRunInitialized(
         "Could not run the root isolate of the Flutter application using the "
         "project arguments specified.");
   }
+
+  fprintf(stderr, "RI9. GL_VERSION='%s'\n", glGetString(GL_VERSION));
 
   return kSuccess;
 }

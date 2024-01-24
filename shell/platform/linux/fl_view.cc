@@ -21,6 +21,9 @@
 #include "flutter/shell/platform/linux/public/flutter_linux/fl_engine.h"
 #include "flutter/shell/platform/linux/public/flutter_linux/fl_plugin_registry.h"
 
+#include <GL/gl.h>
+#include <EGL/egl.h>
+
 //static constexpr int kMicrosecondsPerMillisecond = 1000;
 
 struct _FlView {
@@ -226,9 +229,21 @@ static void fl_view_text_input_delegate_iface_init(
   };
 }
 
-static void realize_cb(GtkWidget* widget) {
-  FlView* self = FL_VIEW(widget);
-  g_autoptr(GError) error = nullptr;
+static GdkGLContext *create_context_cb(FlView *self) {
+   g_printerr("CREATE CONTEXT\n");
+   return gdk_surface_create_gl_context (gtk_native_get_surface (gtk_widget_get_native (GTK_WIDGET(self->gl_area))), NULL);
+}
+
+static void realize_cb(FlView *self) {
+g_printerr("REALIZE\n");
+   
+  gtk_gl_area_make_current (self->gl_area);
+
+  GError *gl_error = gtk_gl_area_get_error (self->gl_area);
+  if (gl_error != NULL) {
+     g_warning("Failed to initialize GLArea: %s", gl_error->message);
+     return;
+  }
 
   // Handle requests by the user to close the application.
   //GtkWidget* toplevel_window = gtk_widget_get_toplevel(GTK_WIDGET(self));
@@ -239,15 +254,34 @@ static void realize_cb(GtkWidget* widget) {
   //g_signal_connect(toplevel_window, "delete-event",
   //                 G_CALLBACK(window_delete_event_cb), self);
 
+   // FIXME: gtk_gl_area_set_error
+
+g_printerr("START RENDERER\n");
+  g_autoptr(GError) error = nullptr;
   if (!fl_renderer_start(self->renderer, self, &error)) {
     g_warning("Failed to start Flutter renderer: %s", error->message);
     return;
   }
 
+  const char*(*egl_glGetString)(GLenum name) = reinterpret_cast<const char*(*)(GLenum name)>(eglGetProcAddress("glGetString"));
+  g_printerr("%p %p\n", glGetString, egl_glGetString);
+  g_printerr("GL_VERSION='%s' '%s'\n", glGetString(GL_VERSION), egl_glGetString(GL_VERSION));
+
+g_printerr("START ENGINE\n");
   if (!fl_engine_start(self->engine, &error)) {
     g_warning("Failed to start Flutter engine: %s", error->message);
     return;
   }
+
+  egl_glGetString = reinterpret_cast<const char*(*)(GLenum name)>(eglGetProcAddress("glGetString"));
+  g_printerr("%p %p\n", glGetString, egl_glGetString);
+  g_printerr("GL_VERSION='%s' '%s'\n", glGetString(GL_VERSION), egl_glGetString(GL_VERSION));
+
+   g_printerr("REALIZE DONE\n");
+}
+
+static void render_cb(FlView *self) {
+g_printerr("RENDER\n");
 }
 
 static void fl_view_constructed(GObject* object) {
@@ -265,8 +299,6 @@ static void fl_view_constructed(GObject* object) {
   //self->accessibility_plugin = fl_accessibility_plugin_new(self);
   self->mouse_cursor_plugin = fl_mouse_cursor_plugin_new(messenger, self);
   self->platform_plugin = fl_platform_plugin_new(messenger);
-
-  g_signal_connect(self, "realize", G_CALLBACK(realize_cb), self);
 }
 
 static void fl_view_set_property(GObject* object,
@@ -334,6 +366,12 @@ static void fl_view_class_init(FlViewClass* klass) {
 
 static void fl_view_init(FlView* self) {
   gtk_widget_set_can_focus(GTK_WIDGET(self), TRUE);
+
+  self->gl_area = GTK_GL_AREA(gtk_gl_area_new());
+  g_signal_connect_swapped(self->gl_area, "create-context", G_CALLBACK(create_context_cb), self);
+  g_signal_connect_swapped(self->gl_area, "realize", G_CALLBACK(realize_cb), self);
+  g_signal_connect_swapped(self->gl_area, "render", G_CALLBACK(render_cb), self);   
+  gtk_box_append(GTK_BOX(self), GTK_WIDGET(self->gl_area));
 }
 
 G_MODULE_EXPORT FlView* fl_view_new(FlDartProject* project) {

@@ -148,6 +148,8 @@ source_set("common") {
     "//flutter/skia",
     "//third_party/dart/runtime:dart_api",
   ]
+  
+  libs = [ "EGL" ]
 
   if (impeller_supports_rendering) {
     sources += [

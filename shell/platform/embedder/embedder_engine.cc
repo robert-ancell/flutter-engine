@@ -40,6 +40,8 @@ EmbedderEngine::EmbedderEngine(
 EmbedderEngine::~EmbedderEngine() = default;
 
 bool EmbedderEngine::LaunchShell() {
+  fprintf(stderr, "LaunchShell\n");
+
   if (!shell_args_) {
     FML_DLOG(ERROR) << "Invalid shell arguments.";
     return false;

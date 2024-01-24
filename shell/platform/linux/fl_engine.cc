@@ -27,6 +27,8 @@
 #include "flutter/shell/platform/linux/public/flutter_linux/fl_plugin_registry.h"
 #include "flutter/shell/platform/linux/public/flutter_linux/fl_string_codec.h"
 
+#include <GL/gl.h>
+
 // Unique number associated with platform tasks.
 static constexpr size_t kPlatformTaskRunnerIdentifier = 1;
 
@@ -485,6 +487,8 @@ gboolean fl_engine_start(FlEngine* self, GError** error) {
 
   self->task_runner = fl_task_runner_new(self);
 
+  g_printerr("ES1. GL_VERSION='%s'\n", glGetString(GL_VERSION));
+
   FlutterRendererConfig config = {};
   config.type = kOpenGL;
   config.open_gl.struct_size = sizeof(FlutterOpenGLRendererConfig);
@@ -559,6 +563,8 @@ gboolean fl_engine_start(FlEngine* self, GError** error) {
     args.aot_data = self->aot_data;
   }
 
+  g_printerr("ES1. GL_VERSION='%s'\n", glGetString(GL_VERSION));
+
   FlutterEngineResult result = self->embedder_api.Initialize(
       FLUTTER_ENGINE_VERSION, &config, &args, self, &self->engine);
   if (result != kSuccess) {
@@ -567,12 +573,16 @@ gboolean fl_engine_start(FlEngine* self, GError** error) {
     return FALSE;
   }
 
-  result = self->embedder_api.RunInitialized(self->engine);
+  g_printerr("ES2. GL_VERSION='%s'\n", glGetString(GL_VERSION));
+
+  result = self->embedder_api.RunInitialized(self->engine); // FAILS IN HERE
   if (result != kSuccess) {
     g_set_error(error, fl_engine_error_quark(), FL_ENGINE_ERROR_FAILED,
                 "Failed to run Flutter engine");
     return FALSE;
   }
+
+  g_printerr("ES3. GL_VERSION='%s'\n", glGetString(GL_VERSION));
 
   setup_locales(self);
 
@@ -580,10 +590,14 @@ gboolean fl_engine_start(FlEngine* self, GError** error) {
   self->settings_plugin = fl_settings_plugin_new(self);
   fl_settings_plugin_start(self->settings_plugin, settings);
 
+  g_printerr("ES4. GL_VERSION='%s'\n", glGetString(GL_VERSION));
+
   result = self->embedder_api.UpdateSemanticsEnabled(self->engine, TRUE);
   if (result != kSuccess) {
     g_warning("Failed to enable accessibility features on Flutter engine");
   }
+
+  g_printerr("ES9. GL_VERSION='%s'\n", glGetString(GL_VERSION));
 
   return TRUE;
 }

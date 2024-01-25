@@ -19,21 +19,20 @@ static gboolean fl_renderer_gl_create_contexts(FlRenderer* renderer,
                                                GdkGLContext** visible,
                                                GdkGLContext** resource,
                                                GError** error) {
-  /*GdkWindow* window = gtk_widget_get_parent_window(widget);
+  GdkSurface* surface = gtk_native_get_surface(gtk_widget_get_native(widget));
 
-  *visible = gdk_window_create_gl_context(window, error);
-
-  if (*error != nullptr) {
-    return FALSE;
-  }
-
-  *resource = gdk_window_create_gl_context(window, error);
+  *visible = gdk_surface_create_gl_context(surface, error);
 
   if (*error != nullptr) {
     return FALSE;
   }
-  return TRUE;*/
-  return FALSE;
+
+  *resource = gdk_surface_create_gl_context(surface, error);
+
+  if (*error != nullptr) {
+    return FALSE;
+  }
+  return TRUE;
 }
 
 // Implements FlRenderer::create_backing_store.

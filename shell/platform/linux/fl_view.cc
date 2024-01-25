@@ -8,6 +8,7 @@
 
 #include <cstring>
 
+#include "flutter/shell/platform/linux/fl_backing_store_provider.h"
 #include "flutter/shell/platform/linux/fl_engine_private.h"
 #include "flutter/shell/platform/linux/fl_key_event.h"
 #include "flutter/shell/platform/linux/fl_keyboard_view_delegate.h"
@@ -21,10 +22,10 @@
 #include "flutter/shell/platform/linux/public/flutter_linux/fl_engine.h"
 #include "flutter/shell/platform/linux/public/flutter_linux/fl_plugin_registry.h"
 
-#include <GL/gl.h>
 #include <EGL/egl.h>
+#include <GL/gl.h>
 
-//static constexpr int kMicrosecondsPerMillisecond = 1000;
+// static constexpr int kMicrosecondsPerMillisecond = 1000;
 
 struct _FlView {
   GtkBox parent_instance;
@@ -42,22 +43,24 @@ struct _FlView {
   int64_t button_state;
 
   // Current state information for the window associated with this view.
-  //GdkWindowState window_state;
+  // GdkWindowState window_state;
 
   // Flutter system channel handlers.
-  //FlAccessibilityPlugin* accessibility_plugin;
+  // FlAccessibilityPlugin* accessibility_plugin;
   FlTextInputPlugin* text_input_plugin;
   FlMouseCursorPlugin* mouse_cursor_plugin;
   FlPlatformPlugin* platform_plugin;
 
   GtkGLArea* gl_area;
 
+  GPtrArray* textures;
+
   // Tracks whether mouse pointer is inside the view.
   gboolean pointer_inside;
 
   /* FlKeyboardViewDelegate related properties */
   KeyboardLayoutNotifier keyboard_layout_notifier;
-  //GdkKeymap* keymap;
+  // GdkKeymap* keymap;
   gulong keymap_keys_changed_cb_id;  // Signal connection ID for
                                      // keymap-keys-changed
   gulong window_state_cb_id;  // Signal connection ID for window-state-changed
@@ -105,10 +108,10 @@ static gboolean window_delete_event_cb(GtkWidget* widget,
 static void update_semantics_node_cb(FlEngine* engine,
                                      const FlutterSemanticsNode* node,
                                      gpointer user_data) {
-  //FlView* self = FL_VIEW(user_data);
+  // FlView* self = FL_VIEW(user_data);
 
-  //fl_accessibility_plugin_handle_update_semantics_node(
-  //    self->accessibility_plugin, node);
+  // fl_accessibility_plugin_handle_update_semantics_node(
+  //     self->accessibility_plugin, node);
 }
 
 // Invoked by the engine right before the engine is restarted.
@@ -167,7 +170,7 @@ static void fl_view_keyboard_delegate_iface_init(
     GdkEventType event_type = gdk_event_get_event_type(gdk_event);
     g_return_if_fail(event_type == GDK_KEY_PRESS ||
                      event_type == GDK_KEY_RELEASE);
-    //gdk_event_put(gdk_event);
+    // gdk_event_put(gdk_event);
     fl_key_event_dispose(event);
   };
 
@@ -179,9 +182,9 @@ static void fl_view_keyboard_delegate_iface_init(
 
   iface->lookup_key = [](FlKeyboardViewDelegate* view_delegate,
                          const GdkKeymapKey* key) -> guint {
-    //FlView* self = FL_VIEW(view_delegate);
-    //g_return_val_if_fail(self->keymap != nullptr, 0);
-    return 0;//gdk_keymap_lookup_key(self->keymap, key);
+    // FlView* self = FL_VIEW(view_delegate);
+    // g_return_val_if_fail(self->keymap != nullptr, 0);
+    return 0;  // gdk_keymap_lookup_key(self->keymap, key);
   };
 
   iface->get_keyboard_state =
@@ -222,66 +225,102 @@ static void fl_view_text_input_delegate_iface_init(
   iface->translate_coordinates = [](FlTextInputViewDelegate* delegate,
                                     gint view_x, gint view_y, gint* window_x,
                                     gint* window_y) {
-    //FlView* self = FL_VIEW(delegate);
-    //gtk_widget_translate_coordinates(GTK_WIDGET(self),
-    //                                 gtk_widget_get_toplevel(GTK_WIDGET(self)),
-    //                                 view_x, view_y, window_x, window_y);
+    // FlView* self = FL_VIEW(delegate);
+    // gtk_widget_translate_coordinates(GTK_WIDGET(self),
+    //                                  gtk_widget_get_toplevel(GTK_WIDGET(self)),
+    //                                  view_x, view_y, window_x, window_y);
   };
 }
 
-static GdkGLContext *create_context_cb(FlView *self) {
-   g_printerr("CREATE CONTEXT\n");
-   return gdk_surface_create_gl_context (gtk_native_get_surface (gtk_widget_get_native (GTK_WIDGET(self->gl_area))), NULL);
+static GdkGLContext* create_context_cb(FlView* self) {
+  g_printerr("CREATE CONTEXT\n");
+  return gdk_surface_create_gl_context(
+      gtk_native_get_surface(gtk_widget_get_native(GTK_WIDGET(self->gl_area))),
+      NULL);
 }
 
-static void realize_cb(FlView *self) {
-g_printerr("REALIZE\n");
-   
-  gtk_gl_area_make_current (self->gl_area);
+static void realize_cb(FlView* self) {
+  g_printerr("REALIZE\n");
 
-  GError *gl_error = gtk_gl_area_get_error (self->gl_area);
+  gtk_gl_area_make_current(self->gl_area);
+
+  GError* gl_error = gtk_gl_area_get_error(self->gl_area);
   if (gl_error != NULL) {
-     g_warning("Failed to initialize GLArea: %s", gl_error->message);
-     return;
+    g_warning("Failed to initialize GLArea: %s", gl_error->message);
+    return;
   }
 
   // Handle requests by the user to close the application.
-  //GtkWidget* toplevel_window = gtk_widget_get_toplevel(GTK_WIDGET(self));
+  // GtkWidget* toplevel_window = gtk_widget_get_toplevel(GTK_WIDGET(self));
 
   // Listen to window state changes.
   // FIXME: How to do in GTK4
 
-  //g_signal_connect(toplevel_window, "delete-event",
-  //                 G_CALLBACK(window_delete_event_cb), self);
+  // g_signal_connect(toplevel_window, "delete-event",
+  //                  G_CALLBACK(window_delete_event_cb), self);
 
-   // FIXME: gtk_gl_area_set_error
+  // FIXME: gtk_gl_area_set_error
 
-g_printerr("START RENDERER\n");
+  g_printerr("START RENDERER\n");
   g_autoptr(GError) error = nullptr;
   if (!fl_renderer_start(self->renderer, self, &error)) {
     g_warning("Failed to start Flutter renderer: %s", error->message);
     return;
   }
 
-  const char*(*egl_glGetString)(GLenum name) = reinterpret_cast<const char*(*)(GLenum name)>(eglGetProcAddress("glGetString"));
+  const char* (*egl_glGetString)(GLenum name) =
+      reinterpret_cast<const char* (*)(GLenum name)>(
+          eglGetProcAddress("glGetString"));
   g_printerr("%p %p\n", glGetString, egl_glGetString);
-  g_printerr("GL_VERSION='%s' '%s'\n", glGetString(GL_VERSION), egl_glGetString(GL_VERSION));
+  g_printerr("GL_VERSION='%s' '%s'\n", glGetString(GL_VERSION),
+             egl_glGetString(GL_VERSION));
 
-g_printerr("START ENGINE\n");
+  g_printerr("START ENGINE\n");
   if (!fl_engine_start(self->engine, &error)) {
     g_warning("Failed to start Flutter engine: %s", error->message);
     return;
   }
 
-  egl_glGetString = reinterpret_cast<const char*(*)(GLenum name)>(eglGetProcAddress("glGetString"));
+  egl_glGetString = reinterpret_cast<const char* (*)(GLenum name)>(
+      eglGetProcAddress("glGetString"));
   g_printerr("%p %p\n", glGetString, egl_glGetString);
-  g_printerr("GL_VERSION='%s' '%s'\n", glGetString(GL_VERSION), egl_glGetString(GL_VERSION));
+  g_printerr("GL_VERSION='%s' '%s'\n", glGetString(GL_VERSION),
+             egl_glGetString(GL_VERSION));
 
-   g_printerr("REALIZE DONE\n");
+  g_printerr("REALIZE DONE\n");
 }
 
-static void render_cb(FlView *self) {
-g_printerr("RENDER\n");
+static gboolean render_cb(FlView* self, GdkGLContext* context) {
+  g_printerr("RENDER\n");
+
+  if (self->textures == nullptr) {
+    return TRUE;
+  }
+
+  glEnable(GL_TEXTURE_2D);
+
+  for (guint i = 0; i < self->textures->len; i++) {
+    FlBackingStoreProvider* texture =
+        FL_BACKING_STORE_PROVIDER(g_ptr_array_index(self->textures, i));
+    uint32_t texture_id = fl_backing_store_provider_get_gl_texture_id(texture);
+    GdkRectangle geometry = fl_backing_store_provider_get_geometry(texture);
+
+    // FIXME: scale?
+    glBindTexture(GL_TEXTURE_2D, texture_id);
+    glLoadIdentity();
+    glBegin(GL_QUADS);
+    glTexCoord2f(0, 0);
+    glVertex2f(geometry.x, geometry.y);
+    glTexCoord2f(1, 0);
+    glVertex2f(geometry.x + geometry.width, geometry.y);
+    glTexCoord2f(1, 1);
+    glVertex2f(geometry.x + geometry.width, geometry.y + geometry.height);
+    glTexCoord2f(0, 1);
+    glVertex2f(geometry.x, geometry.y + geometry.height);
+    glEnd();
+  }
+
+  return TRUE;
 }
 
 static void fl_view_constructed(GObject* object) {
@@ -296,7 +335,7 @@ static void fl_view_constructed(GObject* object) {
 
   // Create system channel handlers.
   FlBinaryMessenger* messenger = fl_engine_get_binary_messenger(self->engine);
-  //self->accessibility_plugin = fl_accessibility_plugin_new(self);
+  // self->accessibility_plugin = fl_accessibility_plugin_new(self);
   self->mouse_cursor_plugin = fl_mouse_cursor_plugin_new(messenger, self);
   self->platform_plugin = fl_platform_plugin_new(messenger);
 }
@@ -340,9 +379,10 @@ static void fl_view_dispose(GObject* object) {
   g_clear_object(&self->project);
   g_clear_object(&self->renderer);
   g_clear_object(&self->engine);
-  //g_clear_object(&self->accessibility_plugin);
+  // g_clear_object(&self->accessibility_plugin);
   g_clear_object(&self->mouse_cursor_plugin);
   g_clear_object(&self->platform_plugin);
+  g_clear_pointer(&self->textures, g_ptr_array_unref);
 
   G_OBJECT_CLASS(fl_view_parent_class)->dispose(object);
 }
@@ -352,7 +392,7 @@ static void fl_view_class_init(FlViewClass* klass) {
   object_class->constructed = fl_view_constructed;
   object_class->set_property = fl_view_set_property;
   object_class->get_property = fl_view_get_property;
-  //object_class->notify = fl_view_notify;
+  // object_class->notify = fl_view_notify;
   object_class->dispose = fl_view_dispose;
 
   g_object_class_install_property(
@@ -368,9 +408,12 @@ static void fl_view_init(FlView* self) {
   gtk_widget_set_can_focus(GTK_WIDGET(self), TRUE);
 
   self->gl_area = GTK_GL_AREA(gtk_gl_area_new());
-  g_signal_connect_swapped(self->gl_area, "create-context", G_CALLBACK(create_context_cb), self);
-  g_signal_connect_swapped(self->gl_area, "realize", G_CALLBACK(realize_cb), self);
-  g_signal_connect_swapped(self->gl_area, "render", G_CALLBACK(render_cb), self);   
+  g_signal_connect_swapped(self->gl_area, "create-context",
+                           G_CALLBACK(create_context_cb), self);
+  g_signal_connect_swapped(self->gl_area, "realize", G_CALLBACK(realize_cb),
+                           self);
+  g_signal_connect_swapped(self->gl_area, "render", G_CALLBACK(render_cb),
+                           self);
   gtk_box_append(GTK_BOX(self), GTK_WIDGET(self->gl_area));
 }
 
@@ -389,7 +432,12 @@ void fl_view_set_textures(FlView* self,
                           GPtrArray* textures) {
   g_return_if_fail(FL_IS_VIEW(self));
 
-  //fl_gl_area_queue_render(self->gl_area, textures);
+  g_printerr("SET_TEXTURES\n");
+
+  g_clear_pointer(&self->textures, g_ptr_array_unref);
+  self->textures = g_ptr_array_ref(textures);
+
+  gtk_widget_queue_draw(GTK_WIDGET(self->gl_area));  // FIXME: queue_render?
 }
 
 GHashTable* fl_view_get_keyboard_state(FlView* self) {

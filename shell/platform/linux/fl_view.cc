@@ -232,13 +232,6 @@ static void fl_view_text_input_delegate_iface_init(
   };
 }
 
-static GdkGLContext* create_context_cb(FlView* self) {
-  g_printerr("CREATE CONTEXT\n");
-  return gdk_surface_create_gl_context(
-      gtk_native_get_surface(gtk_widget_get_native(GTK_WIDGET(self->gl_area))),
-      NULL);
-}
-
 static void realize_cb(FlView* self) {
   g_printerr("REALIZE\n");
 
@@ -308,6 +301,14 @@ static gboolean render_cb(FlView* self, GdkGLContext* context) {
   }
 
   return TRUE;
+}
+
+static void resize_cb(FlView* self, int width, int height) {
+  g_printerr("resize_cb %dx%d\n", width, height);
+
+  gint scale_factor = gtk_widget_get_scale_factor(GTK_WIDGET(self));
+  fl_engine_send_window_metrics_event(self->engine, width * scale_factor,
+                                      height * scale_factor, scale_factor);
 }
 
 static void fl_view_constructed(GObject* object) {
@@ -395,13 +396,15 @@ static void fl_view_init(FlView* self) {
   gtk_widget_set_can_focus(GTK_WIDGET(self), TRUE);
 
   self->gl_area = GTK_GL_AREA(gtk_gl_area_new());
-  g_signal_connect_swapped(self->gl_area, "create-context",
-                           G_CALLBACK(create_context_cb), self);
   g_signal_connect_swapped(self->gl_area, "realize", G_CALLBACK(realize_cb),
                            self);
   g_signal_connect_swapped(self->gl_area, "render", G_CALLBACK(render_cb),
                            self);
+  g_signal_connect_swapped(self->gl_area, "resize", G_CALLBACK(resize_cb),
+                           self);
   gtk_box_append(GTK_BOX(self), GTK_WIDGET(self->gl_area));
+  gtk_widget_set_hexpand(GTK_WIDGET(self->gl_area), TRUE);
+  gtk_widget_set_vexpand(GTK_WIDGET(self->gl_area), TRUE);
 }
 
 G_MODULE_EXPORT FlView* fl_view_new(FlDartProject* project) {

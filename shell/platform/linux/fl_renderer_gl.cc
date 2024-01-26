@@ -97,6 +97,8 @@ static gboolean fl_renderer_gl_collect_backing_store(
 static gboolean fl_renderer_gl_present_layers(FlRenderer* renderer,
                                               const FlutterLayer** layers,
                                               size_t layers_count) {
+  g_printerr("fl_renderer_gl_present_layers\n");
+
   FlView* view = fl_renderer_get_view(renderer);
   GdkGLContext* context = fl_renderer_get_context(renderer);
   if (!view || !context) {

@@ -2074,14 +2074,14 @@ FlutterEngineResult FlutterEngineRunInitialized(
   }
 
   // Step 1: Launch the shell.
-  if (!embedder_engine->LaunchShell()) { // FAILS IN HERE
+  if (!embedder_engine->LaunchShell()) {
     return LOG_EMBEDDER_ERROR(kInvalidArguments,
                               "Could not launch the engine using supplied "
                               "initialization arguments.");
   }
 
   // Step 2: Tell the platform view to initialize itself.
-  if (!embedder_engine->NotifyCreated()) { // context lost
+  if (!embedder_engine->NotifyCreated()) {
     return LOG_EMBEDDER_ERROR(kInternalInconsistency,
                               "Could not create platform view components.");
   }

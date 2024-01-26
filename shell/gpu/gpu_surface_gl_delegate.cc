@@ -8,8 +8,6 @@
 
 #include "third_party/skia/include/gpu/gl/GrGLAssembleInterface.h"
 
-#include <EGL/egl.h>
-
 namespace flutter {
 
 GPUSurfaceGLDelegate::~GPUSurfaceGLDelegate() = default;
@@ -47,7 +45,6 @@ static bool IsProcResolverOpenGLES(
 #else
   using GLGetStringProc = const char* (*)(uint32_t);
 #endif
-  //using GLGetErrorProc = uint32_t(*)();
 
   GLGetStringProc gl_get_string =
       reinterpret_cast<GLGetStringProc>(proc_resolver("glGetString"));
@@ -56,13 +53,6 @@ static bool IsProcResolverOpenGLES(
       << "The GL proc resolver could not resolve glGetString";
 
   const char* gl_version_string = gl_get_string(GPU_GL_VERSION);
-/*   if (gl_version_string == nullptr)
-     {
-	GLGetErrorProc gl_get_error =
-	  reinterpret_cast<GLGetErrorProc>(proc_resolver("glGetError"));
-	FML_LOG(ERROR) << gl_get_error();
-	return false;
-     }*/
 
   FML_CHECK(gl_version_string)
       << "The GL proc resolver's glGetString(GL_VERSION) failed";
@@ -73,11 +63,8 @@ static bool IsProcResolverOpenGLES(
 
 static sk_sp<const GrGLInterface> CreateGLInterface(
     const GPUSurfaceGLDelegate::GLProcResolver& proc_resolver) {
-  fprintf(stderr, "CreateGLInterface %p\n", eglGetCurrentContext());
+  fprintf(stderr, "CreateGLInterface\n");
    
-  const char* (*egl_glGetString)(uint32_t) = reinterpret_cast<const char* (*)(uint32_t)>(proc_resolver("glGetString"));
-  fprintf(stderr, "CGL1. GL_VERSION='%s'\n", egl_glGetString(0x1F02));
-
   if (proc_resolver == nullptr) {
     // If there is no custom proc resolver, ask Skia to guess the native
     // interface. This often leads to interesting results on most platforms.

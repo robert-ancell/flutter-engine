@@ -268,24 +268,11 @@ static void realize_cb(FlView* self) {
     return;
   }
 
-  const char* (*egl_glGetString)(GLenum name) =
-      reinterpret_cast<const char* (*)(GLenum name)>(
-          eglGetProcAddress("glGetString"));
-  g_printerr("%p %p\n", glGetString, egl_glGetString);
-  g_printerr("GL_VERSION='%s' '%s'\n", glGetString(GL_VERSION),
-             egl_glGetString(GL_VERSION));
-
   g_printerr("START ENGINE\n");
   if (!fl_engine_start(self->engine, &error)) {
     g_warning("Failed to start Flutter engine: %s", error->message);
     return;
   }
-
-  egl_glGetString = reinterpret_cast<const char* (*)(GLenum name)>(
-      eglGetProcAddress("glGetString"));
-  g_printerr("%p %p\n", glGetString, egl_glGetString);
-  g_printerr("GL_VERSION='%s' '%s'\n", glGetString(GL_VERSION),
-             egl_glGetString(GL_VERSION));
 
   g_printerr("REALIZE DONE\n");
 }

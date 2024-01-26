@@ -205,6 +205,7 @@ static bool compositor_collect_backing_store_callback(
 static bool compositor_present_layers_callback(const FlutterLayer** layers,
                                                size_t layers_count,
                                                void* user_data) {
+  g_printerr("compositor_present_layers_callback\n");
   g_return_val_if_fail(FL_IS_RENDERER(user_data), false);
   return fl_renderer_present_layers(FL_RENDERER(user_data), layers,
                                     layers_count);
@@ -243,6 +244,7 @@ static uint32_t fl_engine_gl_get_fbo(void* user_data) {
 }
 
 static bool fl_engine_gl_present(void* user_data) {
+  g_printerr("fl_engine_gl_present\n");
   // No action required, as this is handled in
   // compositor_present_layers_callback.
   return true;
@@ -487,8 +489,6 @@ gboolean fl_engine_start(FlEngine* self, GError** error) {
 
   self->task_runner = fl_task_runner_new(self);
 
-  g_printerr("ES1. GL_VERSION='%s'\n", glGetString(GL_VERSION));
-
   FlutterRendererConfig config = {};
   config.type = kOpenGL;
   config.open_gl.struct_size = sizeof(FlutterOpenGLRendererConfig);
@@ -563,8 +563,6 @@ gboolean fl_engine_start(FlEngine* self, GError** error) {
     args.aot_data = self->aot_data;
   }
 
-  g_printerr("ES1. GL_VERSION='%s'\n", glGetString(GL_VERSION));
-
   FlutterEngineResult result = self->embedder_api.Initialize(
       FLUTTER_ENGINE_VERSION, &config, &args, self, &self->engine);
   if (result != kSuccess) {
@@ -573,16 +571,12 @@ gboolean fl_engine_start(FlEngine* self, GError** error) {
     return FALSE;
   }
 
-  g_printerr("ES2. GL_VERSION='%s'\n", glGetString(GL_VERSION));
-
-  result = self->embedder_api.RunInitialized(self->engine); // FAILS IN HERE
+  result = self->embedder_api.RunInitialized(self->engine);
   if (result != kSuccess) {
     g_set_error(error, fl_engine_error_quark(), FL_ENGINE_ERROR_FAILED,
                 "Failed to run Flutter engine");
     return FALSE;
   }
-
-  g_printerr("ES3. GL_VERSION='%s'\n", glGetString(GL_VERSION));
 
   setup_locales(self);
 
@@ -590,14 +584,10 @@ gboolean fl_engine_start(FlEngine* self, GError** error) {
   self->settings_plugin = fl_settings_plugin_new(self);
   fl_settings_plugin_start(self->settings_plugin, settings);
 
-  g_printerr("ES4. GL_VERSION='%s'\n", glGetString(GL_VERSION));
-
   result = self->embedder_api.UpdateSemanticsEnabled(self->engine, TRUE);
   if (result != kSuccess) {
     g_warning("Failed to enable accessibility features on Flutter engine");
   }
-
-  g_printerr("ES9. GL_VERSION='%s'\n", glGetString(GL_VERSION));
 
   return TRUE;
 }

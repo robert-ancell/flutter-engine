@@ -43,8 +43,6 @@
 #include "third_party/skia/include/core/SkGraphics.h"
 #include "third_party/tonic/common/log.h"
 
-#include <EGL/egl.h>
-
 namespace flutter {
 
 constexpr char kSkiaChannel[] = "flutter/skia";
@@ -227,16 +225,12 @@ std::unique_ptr<Shell> Shell::CreateShellOnPlatformThread(
     const Shell::CreateCallback<Rasterizer>& on_create_rasterizer,
     const Shell::EngineCreateCallback& on_create_engine,
     bool is_gpu_disabled) {
-  fprintf(stderr, "CreateShellOnPlatformThread %p\n", eglGetCurrentContext());
-
-  fprintf(stderr, "CSOPT1 %p\n", eglGetCurrentContext());
+  fprintf(stderr, "CreateShellOnPlatformThread\n");
 
   if (!task_runners.IsValid()) {
     FML_LOG(ERROR) << "Task runners to run the shell were invalid.";
     return nullptr;
   }
-
-  fprintf(stderr, "CSOPT2 %p\n", eglGetCurrentContext());
 
   auto shell = std::unique_ptr<Shell>(
       new Shell(std::move(vm), task_runners, std::move(parent_merger),
@@ -246,15 +240,11 @@ std::unique_ptr<Shell> Shell::CreateShellOnPlatformThread(
                     !settings.skia_deterministic_rendering_on_cpu),
                 is_gpu_disabled));
 
-  fprintf(stderr, "CSOPT3 %p\n", eglGetCurrentContext());
-
   // Create the platform view on the platform thread (this thread).
   auto platform_view = on_create_platform_view(*shell.get());
   if (!platform_view || !platform_view->GetWeakPtr()) {
     return nullptr;
   }
-
-  fprintf(stderr, "CSOPT4 %p\n", eglGetCurrentContext());
 
   // Create the rasterizer on the raster thread.
   std::promise<std::unique_ptr<Rasterizer>> rasterizer_promise;
@@ -277,16 +267,12 @@ std::unique_ptr<Shell> Shell::CreateShellOnPlatformThread(
         rasterizer_promise.set_value(std::move(rasterizer));
       });
 
-  fprintf(stderr, "CSOPT5 %p\n", eglGetCurrentContext());
-
   // Ask the platform view for the vsync waiter. This will be used by the engine
   // to create the animator.
   auto vsync_waiter = platform_view->CreateVSyncWaiter();
   if (!vsync_waiter) {
     return nullptr;
   }
-
-  fprintf(stderr, "CSOPT6 %p\n", eglGetCurrentContext());
 
   // Create the IO manager on the IO thread. The IO manager must be initialized
   // first because it has state that the other subsystems depend on. It must
@@ -299,8 +285,6 @@ std::unique_ptr<Shell> Shell::CreateShellOnPlatformThread(
   std::promise<fml::RefPtr<SkiaUnrefQueue>> unref_queue_promise;
   auto unref_queue_future = unref_queue_promise.get_future();
   auto io_task_runner = shell->GetTaskRunners().GetIOTaskRunner();
-
-  fprintf(stderr, "CSOPT7 %p\n", eglGetCurrentContext());
 
   // The platform_view will be stored into shell's platform_view_ in
   // shell->Setup(std::move(platform_view), ...) at the end.
@@ -315,11 +299,7 @@ std::unique_ptr<Shell> Shell::CreateShellOnPlatformThread(
        io_task_runner,                                                    //
        is_backgrounded_sync_switch = shell->GetIsGpuDisabledSyncSwitch()  //
   ]() {
-        // Context gone
-        fprintf(stderr, "ShellSetupIOSubsystem %p\n", eglGetCurrentContext());
-
         TRACE_EVENT0("flutter", "ShellSetupIOSubsystem");
-     
         std::shared_ptr<ShellIOManager> io_manager;
         if (parent_io_manager) {
           io_manager = parent_io_manager;
@@ -335,8 +315,6 @@ std::unique_ptr<Shell> Shell::CreateShellOnPlatformThread(
         unref_queue_promise.set_value(io_manager->GetSkiaUnrefQueue());
         io_manager_promise.set_value(io_manager);
       });
-
-  fprintf(stderr, "CSOPT8 %p\n", eglGetCurrentContext());
 
   // Send dispatcher_maker to the engine constructor because shell won't have
   // platform_view set until Shell::Setup is called later.
@@ -385,8 +363,6 @@ std::unique_ptr<Shell> Shell::CreateShellOnPlatformThread(
             ));
       }));
 
-  fprintf(stderr, "CSOPT9 %p\n", eglGetCurrentContext());
-
   if (!shell->Setup(std::move(platform_view),  //
                     engine_future.get(),       //
                     rasterizer_future.get(),   //
@@ -394,8 +370,6 @@ std::unique_ptr<Shell> Shell::CreateShellOnPlatformThread(
   ) {
     return nullptr;
   }
-
-  fprintf(stderr, "CSOPT10 %p\n", eglGetCurrentContext());
 
   return shell;
 }
@@ -744,9 +718,7 @@ bool Shell::Setup(std::unique_ptr<PlatformView> platform_view,
                   std::unique_ptr<Engine> engine,
                   std::unique_ptr<Rasterizer> rasterizer,
                   const std::shared_ptr<ShellIOManager>& io_manager) {
-  fprintf(stderr, "Shell::Setup %p\n", eglGetCurrentContext());
-
-  fprintf(stderr, "SSU1 %p\n", eglGetCurrentContext());
+  fprintf(stderr, "Shell::Setup\n");
 
   if (is_set_up_) {
     return false;
@@ -769,15 +741,11 @@ bool Shell::Setup(std::unique_ptr<PlatformView> platform_view,
   rasterizer_ = std::move(rasterizer);
   io_manager_ = io_manager;
 
-  fprintf(stderr, "SSU2 %p\n", eglGetCurrentContext());
-
   // Set the external view embedder for the rasterizer.
   auto view_embedder = platform_view_->CreateExternalViewEmbedder();
   rasterizer_->SetExternalViewEmbedder(view_embedder);
   rasterizer_->SetSnapshotSurfaceProducer(
       platform_view_->CreateSnapshotSurfaceProducer());
-
-  fprintf(stderr, "SSU3 %p\n", eglGetCurrentContext());
 
   // The weak ptr must be generated in the platform thread which owns the unique
   // ptr.
@@ -795,8 +763,6 @@ bool Shell::Setup(std::unique_ptr<PlatformView> platform_view,
                                         }
                                       });
   }
-
-  fprintf(stderr, "SSU4 %p\n", eglGetCurrentContext());
 
   is_set_up_ = true;
 

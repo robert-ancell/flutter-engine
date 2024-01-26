@@ -8,9 +8,6 @@
 
 #include "flutter/shell/common/shell_io_manager.h"
 
-#include <GL/gl.h>
-#include <EGL/egl.h>
-
 namespace flutter {
 
 EmbedderSurfaceGL::EmbedderSurfaceGL(
@@ -107,10 +104,6 @@ std::unique_ptr<Surface> EmbedderSurfaceGL::CreateGPUSurface() {
 
 // |EmbedderSurface|
 sk_sp<GrDirectContext> EmbedderSurfaceGL::CreateResourceContext() const {
-  fprintf(stderr, "CreateResourceContext %p\n", eglGetCurrentContext());
-
-  fprintf(stderr, "CRC1. GL_VERSION='%s'\n", glGetString(GL_VERSION));
-
   auto callback = gl_dispatch_table_.gl_make_resource_current_callback;
   if (callback && callback()) {
     if (auto context = ShellIOManager::CreateCompatibleResourceLoadingContext(

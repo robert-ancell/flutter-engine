@@ -149,8 +149,6 @@ source_set("common") {
     "//third_party/dart/runtime:dart_api",
   ]
   
-  libs = [ "EGL" ]
-
   if (impeller_supports_rendering) {
     sources += [
       "snapshot_controller_impeller.cc",

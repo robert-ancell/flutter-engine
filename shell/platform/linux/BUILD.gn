@@ -239,6 +239,7 @@ executable("flutter_linux_unittests") {
     "//flutter/shell/platform/linux/config:gtk",
     "//flutter/shell/platform/linux/config:gl",
     "//flutter/shell/platform/linux/config:egl",
+    "//flutter/shell/platform/linux/config:epoxy",
   ]
 
   defines = [

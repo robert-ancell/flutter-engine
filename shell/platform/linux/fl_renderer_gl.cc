@@ -40,8 +40,6 @@ static gboolean fl_renderer_gl_create_backing_store(
     FlRenderer* renderer,
     const FlutterBackingStoreConfig* config,
     FlutterBackingStore* backing_store_out) {
-  g_printerr("fl_renderer_gl_create_backing_store\n");
-
   g_autoptr(GError) error = nullptr;
   gboolean result = fl_renderer_make_current(renderer, &error);
   if (!result) {
@@ -77,8 +75,6 @@ static gboolean fl_renderer_gl_create_backing_store(
 static gboolean fl_renderer_gl_collect_backing_store(
     FlRenderer* renderer,
     const FlutterBackingStore* backing_store) {
-  g_printerr("fl_renderer_gl_collect_backing_store\n");
-
   g_autoptr(GError) error = nullptr;
   gboolean result = fl_renderer_make_current(renderer, &error);
   if (!result) {
@@ -97,8 +93,6 @@ static gboolean fl_renderer_gl_collect_backing_store(
 static gboolean fl_renderer_gl_present_layers(FlRenderer* renderer,
                                               const FlutterLayer** layers,
                                               size_t layers_count) {
-  g_printerr("fl_renderer_gl_present_layers\n");
-
   FlView* view = fl_renderer_get_view(renderer);
   GdkGLContext* context = fl_renderer_get_context(renderer);
   if (!view || !context) {

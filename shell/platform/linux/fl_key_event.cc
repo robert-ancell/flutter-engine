@@ -17,20 +17,20 @@ FlKeyEvent* fl_key_event_new_from_gdk_event(GdkEvent* event) {
   FlKeyEvent* result = g_new(FlKeyEvent, 1);
 
   guint16 keycode = 0;
-  //gdk_event_get_keycode(event, &keycode);
+  // gdk_event_get_keycode(event, &keycode);
   guint keyval = 0;
-  //gdk_event_get_keyval(event, &keyval);
+  // gdk_event_get_keyval(event, &keyval);
   GdkModifierType state = static_cast<GdkModifierType>(0);
-  //gdk_event_get_state(event, &state);
+  // gdk_event_get_state(event, &state);
   guint group = 0;
-  //gdk_event_get_key_group(event, &group);
+  // gdk_event_get_key_group(event, &group);
 
   result->time = gdk_event_get_time(event);
   result->is_press = type == GDK_KEY_PRESS;
   result->keycode = keycode;
   result->keyval = keyval;
   result->state = state;
-  result->string = g_strdup(""); // event->key.string);
+  result->string = g_strdup("");  // event->key.string);
   result->group = group;
   result->origin = event;
   result->dispose_origin = dispose_origin_from_gdk_event;

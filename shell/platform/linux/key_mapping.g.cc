@@ -445,11 +445,11 @@ void initialize_lock_bit_to_checked_keys(GHashTable* table) {
   data->primary_physical_key = 0x000070039;   // capsLock
   data->primary_logical_key = 0x00100000104;  // capsLock
 
-  //data = g_new(FlKeyEmbedderCheckedKey, 1);
-  //g_hash_table_insert(table, GUINT_TO_POINTER(GDK_MOD2_MASK), data);
-  //data->is_caps_lock = false;
-  //data->primary_physical_key = 0x000070053;   // numLock
-  //data->primary_logical_key = 0x0010000010a;  // numLock
+  // data = g_new(FlKeyEmbedderCheckedKey, 1);
+  // g_hash_table_insert(table, GUINT_TO_POINTER(GDK_MOD2_MASK), data);
+  // data->is_caps_lock = false;
+  // data->primary_physical_key = 0x000070053;   // numLock
+  // data->primary_logical_key = 0x0010000010a;  // numLock
 }
 
 const std::vector<LayoutGoal> layout_goals = {

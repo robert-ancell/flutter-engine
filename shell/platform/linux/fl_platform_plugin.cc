@@ -25,7 +25,7 @@ static constexpr char kInitializationCompleteMethod[] =
 static constexpr char kPlaySoundMethod[] = "SystemSound.play";
 static constexpr char kSystemNavigatorPopMethod[] = "SystemNavigator.pop";
 static constexpr char kTextKey[] = "text";
-//static constexpr char kValueKey[] = "value";
+// static constexpr char kValueKey[] = "value";
 
 static constexpr char kExitTypeKey[] = "type";
 static constexpr char kExitTypeCancelable[] = "cancelable";

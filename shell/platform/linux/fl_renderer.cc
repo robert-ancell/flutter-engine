@@ -57,8 +57,6 @@ static void fl_renderer_class_init(FlRendererClass* klass) {
 static void fl_renderer_init(FlRenderer* self) {}
 
 gboolean fl_renderer_start(FlRenderer* self, FlView* view, GError** error) {
-  g_printerr ("fl_renderer_start\n");
-
   g_return_val_if_fail(FL_IS_RENDERER(self), FALSE);
   FlRendererPrivate* priv = reinterpret_cast<FlRendererPrivate*>(
       fl_renderer_get_instance_private(self));
@@ -97,7 +95,6 @@ void* fl_renderer_get_proc_address(FlRenderer* self, const char* name) {
 gboolean fl_renderer_make_current(FlRenderer* self, GError** error) {
   FlRendererPrivate* priv = reinterpret_cast<FlRendererPrivate*>(
       fl_renderer_get_instance_private(self));
-  g_printerr("make_current\n");
   if (priv->main_context) {
     gdk_gl_context_make_current(priv->main_context);
   }
@@ -108,8 +105,6 @@ gboolean fl_renderer_make_current(FlRenderer* self, GError** error) {
 gboolean fl_renderer_make_resource_current(FlRenderer* self, GError** error) {
   FlRendererPrivate* priv = reinterpret_cast<FlRendererPrivate*>(
       fl_renderer_get_instance_private(self));
-  g_printerr("make_resource_current\n");
-
   if (priv->resource_context) {
     gdk_gl_context_make_current(priv->resource_context);
   }
@@ -118,7 +113,6 @@ gboolean fl_renderer_make_resource_current(FlRenderer* self, GError** error) {
 }
 
 gboolean fl_renderer_clear_current(FlRenderer* self, GError** error) {
-  g_printerr("clear_current\n");
   gdk_gl_context_clear_current();
   return TRUE;
 }

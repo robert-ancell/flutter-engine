@@ -205,7 +205,6 @@ static bool compositor_collect_backing_store_callback(
 static bool compositor_present_layers_callback(const FlutterLayer** layers,
                                                size_t layers_count,
                                                void* user_data) {
-  g_printerr("compositor_present_layers_callback\n");
   g_return_val_if_fail(FL_IS_RENDERER(user_data), false);
   return fl_renderer_present_layers(FL_RENDERER(user_data), layers,
                                     layers_count);
@@ -244,7 +243,6 @@ static uint32_t fl_engine_gl_get_fbo(void* user_data) {
 }
 
 static bool fl_engine_gl_present(void* user_data) {
-  g_printerr("fl_engine_gl_present\n");
   // No action required, as this is handled in
   // compositor_present_layers_callback.
   return true;

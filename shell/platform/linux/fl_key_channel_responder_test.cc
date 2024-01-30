@@ -77,7 +77,8 @@ TEST(FlKeyChannelResponderTest, SendKeyEvent) {
 
   fl_key_responder_handle_event(
       responder,
-      fl_key_event_new_by_mock(12345, true, GDK_KEY_A, 0x04, static_cast<GdkModifierType>(0), "A", false),
+      fl_key_event_new_by_mock(12345, true, GDK_KEY_A, 0x04,
+                               static_cast<GdkModifierType>(0), "A", false),
       responder_callback, loop);
   expected_value =
       "{type: keydown, keymap: linux, scanCode: 4, toolkit: gtk, keyCode: 65, "
@@ -89,7 +90,8 @@ TEST(FlKeyChannelResponderTest, SendKeyEvent) {
 
   fl_key_responder_handle_event(
       responder,
-      fl_key_event_new_by_mock(23456, false, GDK_KEY_A, 0x04, static_cast<GdkModifierType>(0), "A", false),
+      fl_key_event_new_by_mock(23456, false, GDK_KEY_A, 0x04,
+                               static_cast<GdkModifierType>(0), "A", false),
       responder_callback, loop);
   expected_value =
       "{type: keyup, keymap: linux, scanCode: 4, toolkit: gtk, keyCode: 65, "
@@ -116,8 +118,8 @@ void test_lock_event(guint key_code,
 
   fl_key_responder_handle_event(
       responder,
-      fl_key_event_new_by_mock(12345, true, key_code, 0x04, static_cast<GdkModifierType>(0), nullptr,
-                               false),
+      fl_key_event_new_by_mock(12345, true, key_code, 0x04,
+                               static_cast<GdkModifierType>(0), nullptr, false),
       responder_callback, loop);
   expected_value = down_expected;
   expected_handled = FALSE;
@@ -129,8 +131,8 @@ void test_lock_event(guint key_code,
   expected_handled = FALSE;
   fl_key_responder_handle_event(
       responder,
-      fl_key_event_new_by_mock(12346, false, key_code, 0x04, static_cast<GdkModifierType>(0), nullptr,
-                               false),
+      fl_key_event_new_by_mock(12346, false, key_code, 0x04,
+                               static_cast<GdkModifierType>(0), nullptr, false),
       responder_callback, loop);
 
   // Blocks here until echo_response_cb is called.
@@ -138,7 +140,7 @@ void test_lock_event(guint key_code,
 }
 
 // Test sending a "NumLock" keypress.
-//TEST(FlKeyChannelResponderTest, SendNumLockKeyEvent) {
+// TEST(FlKeyChannelResponderTest, SendNumLockKeyEvent) {
 //  test_lock_event(GDK_KEY_Num_Lock,
 //                  "{type: keydown, keymap: linux, scanCode: 4, toolkit: gtk, "
 //                  "keyCode: 65407, modifiers: 16}",
@@ -178,8 +180,8 @@ TEST(FlKeyChannelResponderTest, TestKeyEventHandledByFramework) {
 
   fl_key_responder_handle_event(
       responder,
-      fl_key_event_new_by_mock(12345, true, GDK_KEY_A, 0x04, static_cast<GdkModifierType>(0), nullptr,
-                               false),
+      fl_key_event_new_by_mock(12345, true, GDK_KEY_A, 0x04,
+                               static_cast<GdkModifierType>(0), nullptr, false),
       responder_callback, loop);
   expected_handled = TRUE;
   expected_value =
@@ -204,8 +206,8 @@ TEST(FlKeyChannelResponderTest, UseSpecifiedLogicalKey) {
 
   fl_key_responder_handle_event(
       responder,
-      fl_key_event_new_by_mock(12345, true, GDK_KEY_A, 0x04, static_cast<GdkModifierType>(0), nullptr,
-                               false),
+      fl_key_event_new_by_mock(12345, true, GDK_KEY_A, 0x04,
+                               static_cast<GdkModifierType>(0), nullptr, false),
       responder_callback, loop, 888);
   expected_handled = TRUE;
   expected_value =

@@ -22,8 +22,7 @@
 #include "flutter/shell/platform/linux/public/flutter_linux/fl_engine.h"
 #include "flutter/shell/platform/linux/public/flutter_linux/fl_plugin_registry.h"
 
-#include <EGL/egl.h>
-#include <GL/gl.h>
+#include <epoxy/gl.h>
 
 // static constexpr int kMicrosecondsPerMillisecond = 1000;
 
@@ -52,6 +51,7 @@ struct _FlView {
   FlPlatformPlugin* platform_plugin;
 
   GtkGLArea* gl_area;
+  GLuint program;
 
   GPtrArray* textures;
 
@@ -232,9 +232,49 @@ static void fl_view_text_input_delegate_iface_init(
   };
 }
 
-static void realize_cb(FlView* self) {
-  g_printerr("REALIZE\n");
+static const char* vertex_shader_src =
+    "attribute vec2 position;\n"
+    "attribute vec2 in_texcoord;\n"
+    "varying vec2 texcoord;\n"
+    "\n"
+    "void main() {\n"
+    "  gl_Position = vec4(position, 0, 1);\n"
+    "  texcoord = in_texcoord;\n"
+    "}\n";
 
+static const char* fragment_shader_src =
+    "uniform sampler2D texture;\n"
+    "varying vec2 texcoord;\n"
+    "\n"
+    "void main() {\n"
+    "  gl_FragColor = texture2D(texture, texcoord);\n"
+    "}\n";
+
+static gchar* get_shader_log(GLuint shader) {
+  int log_length;
+  gchar* log;
+
+  glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &log_length);
+
+  log = static_cast<gchar*>(g_malloc(log_length + 1));
+  glGetShaderInfoLog(shader, log_length, NULL, log);
+
+  return log;
+}
+
+static gchar* get_program_log(GLuint program) {
+  int log_length;
+  gchar* log;
+
+  glGetProgramiv(program, GL_INFO_LOG_LENGTH, &log_length);
+
+  log = static_cast<gchar*>(g_malloc(log_length + 1));
+  glGetProgramInfoLog(program, log_length, NULL, log);
+
+  return log;
+}
+
+static void realize_cb(FlView* self) {
   gtk_gl_area_make_current(self->gl_area);
 
   GError* gl_error = gtk_gl_area_get_error(self->gl_area);
@@ -242,6 +282,41 @@ static void realize_cb(FlView* self) {
     g_warning("Failed to initialize GLArea: %s", gl_error->message);
     return;
   }
+
+  GLuint vertex_shader = glCreateShader(GL_VERTEX_SHADER);
+  glShaderSource(vertex_shader, 1, &vertex_shader_src, NULL);
+  glCompileShader(vertex_shader);
+  int vertex_compile_status;
+  glGetShaderiv(vertex_shader, GL_COMPILE_STATUS, &vertex_compile_status);
+  if (vertex_compile_status == GL_FALSE) {
+    g_autofree gchar* shader_log = get_shader_log(vertex_shader);
+    g_warning("Failed to compile vertex shader: %s", shader_log);
+  }
+
+  GLuint fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
+  glShaderSource(fragment_shader, 1, &fragment_shader_src, NULL);
+  glCompileShader(fragment_shader);
+  int fragment_compile_status;
+  glGetShaderiv(fragment_shader, GL_COMPILE_STATUS, &fragment_compile_status);
+  if (fragment_compile_status == GL_FALSE) {
+    g_autofree gchar* shader_log = get_shader_log(fragment_shader);
+    g_warning("Failed to compile fragment shader: %s", shader_log);
+  }
+
+  self->program = glCreateProgram();
+  glAttachShader(self->program, vertex_shader);
+  glAttachShader(self->program, fragment_shader);
+  glLinkProgram(self->program);
+
+  int link_status;
+  glGetProgramiv(self->program, GL_LINK_STATUS, &link_status);
+  if (link_status == GL_FALSE) {
+    g_autofree gchar* program_log = get_program_log(self->program);
+    g_warning("Failed to link program: %s", program_log);
+  }
+
+  glDeleteShader(vertex_shader);
+  glDeleteShader(fragment_shader);
 
   // Handle requests by the user to close the application.
   // GtkWidget* toplevel_window = gtk_widget_get_toplevel(GTK_WIDGET(self));
@@ -254,58 +329,97 @@ static void realize_cb(FlView* self) {
 
   // FIXME: gtk_gl_area_set_error
 
-  g_printerr("START RENDERER\n");
   g_autoptr(GError) error = nullptr;
   if (!fl_renderer_start(self->renderer, self, &error)) {
     g_warning("Failed to start Flutter renderer: %s", error->message);
     return;
   }
 
-  g_printerr("START ENGINE\n");
   if (!fl_engine_start(self->engine, &error)) {
     g_warning("Failed to start Flutter engine: %s", error->message);
     return;
   }
+}
 
-  g_printerr("REALIZE DONE\n");
+static void unrealize_cb(FlView* self) {
+  gtk_gl_area_make_current(self->gl_area);
+
+  GError* gl_error = gtk_gl_area_get_error(self->gl_area);
+  if (gl_error != NULL) {
+    g_warning("Failed to cleanup GLArea: %s", gl_error->message);
+    return;
+  }
+
+  glDeleteProgram(self->program);
 }
 
 static gboolean render_cb(FlView* self, GdkGLContext* context) {
-  g_printerr("RENDER\n");
+  if (gtk_gl_area_get_error(self->gl_area) != NULL) {
+    return FALSE;
+  }
 
   if (self->textures == nullptr) {
     return TRUE;
   }
 
-  glEnable(GL_TEXTURE_2D);
+  glClearColor(0.5, 0.5, 0.5, 1.0);
+  glClear(GL_COLOR_BUFFER_BIT);
+
+  glUseProgram(self->program);
 
   for (guint i = 0; i < self->textures->len; i++) {
     FlBackingStoreProvider* texture =
         FL_BACKING_STORE_PROVIDER(g_ptr_array_index(self->textures, i));
     uint32_t texture_id = fl_backing_store_provider_get_gl_texture_id(texture);
-    GdkRectangle geometry = fl_backing_store_provider_get_geometry(texture);
+    // GdkRectangle geometry = fl_backing_store_provider_get_geometry(texture);
 
     // FIXME: scale?
+
+    // GLfloat x = geometry.x;
+    // GLfloat y = geometry.y;
+    // GLfloat width = geometry.width;
+    // GLfloat height = geometry.height;
+    // GLfloat vertices[12] = {x,         y,          x + width, y,
+    //                          x + width, y + height, x,         y,
+    //                          x + width, y + height, x,         y + height};
+    // glVertexPointer(2, GL_FLOAT, sizeof(GLfloat) * 2, vertices);
+    // glTexCoordPointer(2, GL_FLOAT, sizeof(GLfloat) * 2, tex_coords);
+    // glEnableClientState(GL_VERTEX_ARRAY);
+    // glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+    static const GLfloat vertex_data[] = {-1, -1, 0, 0, 1,  1,  1, 1,
+                                          -1, 1,  0, 1, -1, -1, 0, 0,
+                                          1,  -1, 1, 0, 1,  1,  1, 1};
+
     glBindTexture(GL_TEXTURE_2D, texture_id);
-    glLoadIdentity();
-    glBegin(GL_QUADS);
-    glTexCoord2f(0, 0);
-    glVertex2f(geometry.x, geometry.y);
-    glTexCoord2f(1, 0);
-    glVertex2f(geometry.x + geometry.width, geometry.y);
-    glTexCoord2f(1, 1);
-    glVertex2f(geometry.x + geometry.width, geometry.y + geometry.height);
-    glTexCoord2f(0, 1);
-    glVertex2f(geometry.x, geometry.y + geometry.height);
-    glEnd();
+
+    GLuint vao, vertex_buffer;
+    glGenVertexArrays(1, &vao);
+    glBindVertexArray(vao);
+    glGenBuffers(1, &vertex_buffer);
+    glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertex_data), vertex_data,
+                 GL_STATIC_DRAW);
+    GLint position_index = glGetAttribLocation(self->program, "position");
+    glEnableVertexAttribArray(position_index);
+    glVertexAttribPointer(position_index, 2, GL_FLOAT, GL_FALSE,
+                          sizeof(GLfloat) * 4, 0);
+    GLint texcoord_index = glGetAttribLocation(self->program, "in_texcoord");
+    glEnableVertexAttribArray(texcoord_index);
+    glVertexAttribPointer(texcoord_index, 2, GL_FLOAT, GL_FALSE,
+                          sizeof(GLfloat) * 4, (void*)(sizeof(GLfloat) * 2));
+
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+
+    glDeleteVertexArrays(1, &vao);
+    glDeleteBuffers(1, &vertex_buffer);
   }
+
+  glFlush();
 
   return TRUE;
 }
 
 static void resize_cb(FlView* self, int width, int height) {
-  g_printerr("resize_cb %dx%d\n", width, height);
-
   gint scale_factor = gtk_widget_get_scale_factor(GTK_WIDGET(self));
   fl_engine_send_window_metrics_event(self->engine, width * scale_factor,
                                       height * scale_factor, scale_factor);
@@ -398,6 +512,8 @@ static void fl_view_init(FlView* self) {
   self->gl_area = GTK_GL_AREA(gtk_gl_area_new());
   g_signal_connect_swapped(self->gl_area, "realize", G_CALLBACK(realize_cb),
                            self);
+  g_signal_connect_swapped(self->gl_area, "unrealize", G_CALLBACK(unrealize_cb),
+                           self);
   g_signal_connect_swapped(self->gl_area, "render", G_CALLBACK(render_cb),
                            self);
   g_signal_connect_swapped(self->gl_area, "resize", G_CALLBACK(resize_cb),
@@ -421,8 +537,6 @@ void fl_view_set_textures(FlView* self,
                           GdkGLContext* context,
                           GPtrArray* textures) {
   g_return_if_fail(FL_IS_VIEW(self));
-
-  g_printerr("SET_TEXTURES\n");
 
   g_clear_pointer(&self->textures, g_ptr_array_unref);
   self->textures = g_ptr_array_ref(textures);

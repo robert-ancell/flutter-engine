@@ -24,7 +24,7 @@
 
 #include <epoxy/gl.h>
 
-// static constexpr int kMicrosecondsPerMillisecond = 1000;
+static constexpr int kMicrosecondsPerMillisecond = 1000;
 
 struct _FlView {
   GtkBox parent_instance;
@@ -49,6 +49,9 @@ struct _FlView {
   FlTextInputPlugin* text_input_plugin;
   FlMouseCursorPlugin* mouse_cursor_plugin;
   FlPlatformPlugin* platform_plugin;
+
+  GtkGesture* click_gesture;
+  GtkEventController* motion_controller;
 
   GtkGLArea* gl_area;
   GLuint program;
@@ -230,6 +233,43 @@ static void fl_view_text_input_delegate_iface_init(
     //                                  gtk_widget_get_toplevel(GTK_WIDGET(self)),
     //                                  view_x, view_y, window_x, window_y);
   };
+}
+
+static void send_mouse_pointer_event(FlView* self,
+                                     FlutterPointerPhase phase,
+                                     guint32 timestamp,
+                                     double x,
+                                     double y) {
+  fl_engine_send_mouse_pointer_event(self->engine, phase,
+                                     timestamp * kMicrosecondsPerMillisecond, x,
+                                     y, 0, 0, self->button_state);
+}
+
+static void primary_pressed_cb(FlView* self, int n_press, double x, double y) {
+  self->button_state ^= kFlutterPointerButtonMousePrimary;
+  send_mouse_pointer_event(self, kDown,
+                           gtk_event_controller_get_current_event_time(
+                               GTK_EVENT_CONTROLLER(self->click_gesture)),
+                           x, y);
+}
+
+static void primary_released_cb(FlView* self, int n_press, double x, double y) {
+  self->button_state ^= kFlutterPointerButtonMousePrimary;
+  send_mouse_pointer_event(self, kUp,
+                           gtk_event_controller_get_current_event_time(
+                               GTK_EVENT_CONTROLLER(self->click_gesture)),
+                           x, y);
+}
+
+static void enter_cb(FlView* self, gdouble x, gdouble y) {}
+
+static void leave_cb(FlView* self) {}
+
+static void motion_cb(FlView* self, gdouble x, gdouble y) {
+  // send_mouse_pointer_event(
+  //     self, kMove,
+  //     gtk_event_controller_get_current_event_time(self->motion_controller),
+  //     x, y);
 }
 
 static const char* vertex_shader_src =
@@ -440,6 +480,23 @@ static void fl_view_constructed(GObject* object) {
   // self->accessibility_plugin = fl_accessibility_plugin_new(self);
   self->mouse_cursor_plugin = fl_mouse_cursor_plugin_new(messenger, self);
   self->platform_plugin = fl_platform_plugin_new(messenger);
+
+  self->click_gesture = gtk_gesture_click_new();
+  g_signal_connect_swapped(self->click_gesture, "pressed",
+                           G_CALLBACK(primary_pressed_cb), self);
+  g_signal_connect_swapped(self->click_gesture, "released",
+                           G_CALLBACK(primary_released_cb), self);
+  gtk_widget_add_controller(GTK_WIDGET(self),
+                            GTK_EVENT_CONTROLLER(self->click_gesture));
+
+  self->motion_controller = gtk_event_controller_motion_new();
+  g_signal_connect_swapped(self->motion_controller, "enter",
+                           G_CALLBACK(enter_cb), self);
+  g_signal_connect_swapped(self->motion_controller, "leave",
+                           G_CALLBACK(leave_cb), self);
+  g_signal_connect_swapped(self->motion_controller, "motion",
+                           G_CALLBACK(motion_cb), self);
+  gtk_widget_add_controller(GTK_WIDGET(self), self->motion_controller);
 }
 
 static void fl_view_set_property(GObject* object,

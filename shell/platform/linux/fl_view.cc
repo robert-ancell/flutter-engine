@@ -11,6 +11,7 @@
 #include "flutter/shell/platform/linux/fl_backing_store_provider.h"
 #include "flutter/shell/platform/linux/fl_engine_private.h"
 #include "flutter/shell/platform/linux/fl_key_event.h"
+#include "flutter/shell/platform/linux/fl_keyboard_manager.h"
 #include "flutter/shell/platform/linux/fl_keyboard_view_delegate.h"
 #include "flutter/shell/platform/linux/fl_mouse_cursor_plugin.h"
 #include "flutter/shell/platform/linux/fl_platform_plugin.h"
@@ -46,12 +47,14 @@ struct _FlView {
 
   // Flutter system channel handlers.
   // FlAccessibilityPlugin* accessibility_plugin;
+  FlKeyboardManager* keyboard_manager;
   FlTextInputPlugin* text_input_plugin;
   FlMouseCursorPlugin* mouse_cursor_plugin;
   FlPlatformPlugin* platform_plugin;
 
   GtkGesture* click_gesture;
   GtkEventController* motion_controller;
+  GtkEventController* key_controller;
 
   GtkGLArea* gl_area;
   GLuint program;
@@ -107,6 +110,22 @@ static gboolean window_delete_event_cb(GtkWidget* widget,
 }
 #endif
 
+// Initialize keyboard manager.
+static void init_keyboard(FlView* self) {
+  FlBinaryMessenger* messenger = fl_engine_get_binary_messenger(self->engine);
+
+  // GdkWindow* window =
+  //     gtk_widget_get_window(gtk_widget_get_toplevel(GTK_WIDGET(self)));
+  // g_return_if_fail(GDK_IS_WINDOW(window));
+  // g_autoptr(GtkIMContext) im_context = gtk_im_multicontext_new();
+  // gtk_im_context_set_client_window(im_context, window);
+
+  // self->text_input_plugin = fl_text_input_plugin_new(
+  //     messenger, im_context, FL_TEXT_INPUT_VIEW_DELEGATE(self));
+  self->keyboard_manager =
+      fl_keyboard_manager_new(messenger, FL_KEYBOARD_VIEW_DELEGATE(self));
+}
+
 // Called when the engine updates accessibility nodes.
 static void update_semantics_node_cb(FlEngine* engine,
                                      const FlutterSemanticsNode* node,
@@ -125,7 +144,11 @@ static void update_semantics_node_cb(FlEngine* engine,
 static void on_pre_engine_restart_cb(FlEngine* engine, gpointer user_data) {
   FlView* self = FL_VIEW(user_data);
 
+  g_clear_object(&self->keyboard_manager);
   g_clear_object(&self->text_input_plugin);
+  //g_clear_object(&self->scrolling_manager);
+  init_keyboard(self);
+  //init_scrolling(self);
 }
 
 // Implements FlPluginRegistry::get_registrar_for_plugin.
@@ -282,6 +305,18 @@ static void motion_cb(FlView* self, gdouble x, gdouble y) {
       y);
 }
 
+static gboolean key_pressed_cb(FlView* self,
+                               guint keyval,
+                               guint keycode,
+                               GdkModifierType state) {
+  return TRUE;
+}
+
+static void key_released_cb(FlView* self,
+                            guint keyval,
+                            guint keycode,
+                            GdkModifierType state) {}
+
 static const char* vertex_shader_src =
     "attribute vec2 position;\n"
     "attribute vec2 in_texcoord;\n"
@@ -378,6 +413,8 @@ static void realize_cb(FlView* self) {
   //                  G_CALLBACK(window_delete_event_cb), self);
 
   // FIXME: gtk_gl_area_set_error
+
+  init_keyboard(self);
 
   g_autoptr(GError) error = nullptr;
   if (!fl_renderer_start(self->renderer, self, &error)) {
@@ -507,6 +544,13 @@ static void fl_view_constructed(GObject* object) {
   g_signal_connect_swapped(self->motion_controller, "motion",
                            G_CALLBACK(motion_cb), self);
   gtk_widget_add_controller(GTK_WIDGET(self), self->motion_controller);
+
+  self->key_controller = gtk_event_controller_key_new();
+  g_signal_connect_swapped(self->key_controller, "key-pressed",
+                           G_CALLBACK(key_pressed_cb), self);
+  g_signal_connect_swapped(self->key_controller, "key-released",
+                           G_CALLBACK(key_released_cb), self);
+  gtk_widget_add_controller(GTK_WIDGET(self), self->key_controller);
 }
 
 static void fl_view_set_property(GObject* object,
@@ -551,6 +595,9 @@ static void fl_view_dispose(GObject* object) {
   // g_clear_object(&self->accessibility_plugin);
   g_clear_object(&self->mouse_cursor_plugin);
   g_clear_object(&self->platform_plugin);
+  // g_clear_object(&self->click_gesture); // FIXME: Required?
+  // g_clear_object(&self->motion_controller);
+  // g_clear_object(&self->key_controller);
   g_clear_pointer(&self->textures, g_ptr_array_unref);
 
   G_OBJECT_CLASS(fl_view_parent_class)->dispose(object);
@@ -614,5 +661,5 @@ void fl_view_set_textures(FlView* self,
 GHashTable* fl_view_get_keyboard_state(FlView* self) {
   g_return_val_if_fail(FL_IS_VIEW(self), nullptr);
 
-  return nullptr;
+  return fl_keyboard_manager_get_pressed_state(self->keyboard_manager);
 }

@@ -63,8 +63,6 @@ static bool IsProcResolverOpenGLES(
 
 static sk_sp<const GrGLInterface> CreateGLInterface(
     const GPUSurfaceGLDelegate::GLProcResolver& proc_resolver) {
-  fprintf(stderr, "CreateGLInterface\n");
-   
   if (proc_resolver == nullptr) {
     // If there is no custom proc resolver, ask Skia to guess the native
     // interface. This often leads to interesting results on most platforms.

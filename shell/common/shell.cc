@@ -171,8 +171,6 @@ std::unique_ptr<Shell> Shell::Create(
     const Shell::CreateCallback<PlatformView>& on_create_platform_view,
     const Shell::CreateCallback<Rasterizer>& on_create_rasterizer,
     bool is_gpu_disabled) {
-  fprintf(stderr, "Create\n");
-
   // This must come first as it initializes tracing.
   PerformInitializationTasks(settings);
 
@@ -225,8 +223,6 @@ std::unique_ptr<Shell> Shell::CreateShellOnPlatformThread(
     const Shell::CreateCallback<Rasterizer>& on_create_rasterizer,
     const Shell::EngineCreateCallback& on_create_engine,
     bool is_gpu_disabled) {
-  fprintf(stderr, "CreateShellOnPlatformThread\n");
-
   if (!task_runners.IsValid()) {
     FML_LOG(ERROR) << "Task runners to run the shell were invalid.";
     return nullptr;
@@ -388,8 +384,6 @@ std::unique_ptr<Shell> Shell::CreateWithSnapshot(
     const Shell::CreateCallback<Rasterizer>& on_create_rasterizer,
     const Shell::EngineCreateCallback& on_create_engine,
     bool is_gpu_disabled) {
-  fprintf(stderr, "CreateWithSnapshot\n");
-
   // This must come first as it initializes tracing.
   PerformInitializationTasks(settings);
 
@@ -718,8 +712,6 @@ bool Shell::Setup(std::unique_ptr<PlatformView> platform_view,
                   std::unique_ptr<Engine> engine,
                   std::unique_ptr<Rasterizer> rasterizer,
                   const std::shared_ptr<ShellIOManager>& io_manager) {
-  fprintf(stderr, "Shell::Setup\n");
-
   if (is_set_up_) {
     return false;
   }
@@ -818,8 +810,6 @@ DartVM* Shell::GetDartVM() {
 
 // |PlatformView::Delegate|
 void Shell::OnPlatformViewCreated(std::unique_ptr<Surface> surface) {
-  fprintf(stderr, "OnPlatformViewCreated\n");
-
   TRACE_EVENT0("flutter", "Shell::OnPlatformViewCreated");
   FML_DCHECK(is_set_up_);
   FML_DCHECK(task_runners_.GetPlatformTaskRunner()->RunsTasksOnCurrentThread());

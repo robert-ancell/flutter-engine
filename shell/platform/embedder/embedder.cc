@@ -2063,8 +2063,6 @@ FlutterEngineResult FlutterEngineRunInitialized(
     return LOG_EMBEDDER_ERROR(kInvalidArguments, "Engine handle was invalid.");
   }
 
-  fprintf(stderr, "FlutterEngineRunInitialized\n");
-
   auto embedder_engine = reinterpret_cast<flutter::EmbedderEngine*>(engine);
 
   // The engine must not already be running. Initialize may only be called

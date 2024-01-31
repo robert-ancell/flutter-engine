@@ -405,8 +405,6 @@ if (enable_unittests) {
       libs = [ "psapi.lib" ]
     }
 
-    libs = [ "GL", "EGL" ]
-
     deps = [
       ":embedder",
       ":embedder_gpu_configuration",
@@ -437,8 +435,6 @@ shared_library("flutter_engine_library") {
   }
 
   deps = [ ":embedder" ]
-
-  libs = [ "GL", "EGL" ]
 
   public_configs = [ "//flutter:config" ]
 }

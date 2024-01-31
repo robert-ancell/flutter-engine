@@ -261,15 +261,25 @@ static void primary_released_cb(FlView* self, int n_press, double x, double y) {
                            x, y);
 }
 
-static void enter_cb(FlView* self, gdouble x, gdouble y) {}
+static void enter_cb(FlView* self, gdouble x, gdouble y) {
+  send_mouse_pointer_event(
+      self, kAdd,
+      gtk_event_controller_get_current_event_time(self->motion_controller), x,
+      y);
+}
 
-static void leave_cb(FlView* self) {}
+static void leave_cb(FlView* self) {
+  send_mouse_pointer_event(
+      self, kRemove,
+      gtk_event_controller_get_current_event_time(self->motion_controller), 0,
+      0);
+}
 
 static void motion_cb(FlView* self, gdouble x, gdouble y) {
-  // send_mouse_pointer_event(
-  //     self, kMove,
-  //     gtk_event_controller_get_current_event_time(self->motion_controller),
-  //     x, y);
+  send_mouse_pointer_event(
+      self, self->button_state != 0 ? kMove : kHover,
+      gtk_event_controller_get_current_event_time(self->motion_controller), x,
+      y);
 }
 
 static const char* vertex_shader_src =

@@ -17,6 +17,7 @@
 #include "flutter/shell/platform/linux/fl_platform_plugin.h"
 #include "flutter/shell/platform/linux/fl_plugin_registrar_private.h"
 #include "flutter/shell/platform/linux/fl_renderer_gl.h"
+#include "flutter/shell/platform/linux/fl_scrolling_manager.h"
 #include "flutter/shell/platform/linux/fl_scrolling_view_delegate.h"
 #include "flutter/shell/platform/linux/fl_text_input_plugin.h"
 #include "flutter/shell/platform/linux/fl_text_input_view_delegate.h"
@@ -48,6 +49,7 @@ struct _FlView {
   // Flutter system channel handlers.
   // FlAccessibilityPlugin* accessibility_plugin;
   FlKeyboardManager* keyboard_manager;
+  FlScrollingManager* scrolling_manager;
   FlTextInputPlugin* text_input_plugin;
   FlMouseCursorPlugin* mouse_cursor_plugin;
   FlPlatformPlugin* platform_plugin;
@@ -126,6 +128,11 @@ static void init_keyboard(FlView* self) {
       fl_keyboard_manager_new(messenger, FL_KEYBOARD_VIEW_DELEGATE(self));
 }
 
+static void init_scrolling(FlView* self) {
+  self->scrolling_manager =
+      fl_scrolling_manager_new(FL_SCROLLING_VIEW_DELEGATE(self));
+}
+
 // Called when the engine updates accessibility nodes.
 static void update_semantics_node_cb(FlEngine* engine,
                                      const FlutterSemanticsNode* node,
@@ -146,9 +153,9 @@ static void on_pre_engine_restart_cb(FlEngine* engine, gpointer user_data) {
 
   g_clear_object(&self->keyboard_manager);
   g_clear_object(&self->text_input_plugin);
-  //g_clear_object(&self->scrolling_manager);
+  g_clear_object(&self->scrolling_manager);
   init_keyboard(self);
-  //init_scrolling(self);
+  init_scrolling(self);
 }
 
 // Implements FlPluginRegistry::get_registrar_for_plugin.
@@ -192,11 +199,11 @@ static void fl_view_keyboard_delegate_iface_init(
   iface->redispatch_event = [](FlKeyboardViewDelegate* view_delegate,
                                std::unique_ptr<FlKeyEvent> in_event) {
     FlKeyEvent* event = in_event.release();
-    GdkEvent* gdk_event = reinterpret_cast<GdkEvent*>(event->origin);
-    GdkEventType event_type = gdk_event_get_event_type(gdk_event);
-    g_return_if_fail(event_type == GDK_KEY_PRESS ||
-                     event_type == GDK_KEY_RELEASE);
-    // gdk_event_put(gdk_event);
+    // GdkEvent* gdk_event = reinterpret_cast<GdkEvent*>(event->origin);
+    // GdkEventType event_type = gdk_event_get_event_type(gdk_event);
+    // g_return_if_fail(event_type == GDK_KEY_PRESS ||
+    //                  event_type == GDK_KEY_RELEASE);
+    //  gdk_event_put(gdk_event);
     fl_key_event_dispose(event);
   };
 
@@ -309,13 +316,27 @@ static gboolean key_pressed_cb(FlView* self,
                                guint keyval,
                                guint keycode,
                                GdkModifierType state) {
-  return TRUE;
+  return fl_keyboard_manager_handle_event(
+      self->keyboard_manager,
+      fl_key_event_new(
+          gtk_event_controller_get_current_event_time(self->key_controller),
+          TRUE, keycode, keyval, state,
+          gtk_event_controller_key_get_group(
+              GTK_EVENT_CONTROLLER_KEY(self->key_controller))));
 }
 
 static void key_released_cb(FlView* self,
                             guint keyval,
                             guint keycode,
-                            GdkModifierType state) {}
+                            GdkModifierType state) {
+  fl_keyboard_manager_handle_event(
+      self->keyboard_manager,
+      fl_key_event_new(
+          gtk_event_controller_get_current_event_time(self->key_controller),
+          FALSE, keycode, keyval, state,
+          gtk_event_controller_key_get_group(
+              GTK_EVENT_CONTROLLER_KEY(self->key_controller))));
+}
 
 static const char* vertex_shader_src =
     "attribute vec2 position;\n"
@@ -525,6 +546,7 @@ static void fl_view_constructed(GObject* object) {
   // Create system channel handlers.
   FlBinaryMessenger* messenger = fl_engine_get_binary_messenger(self->engine);
   // self->accessibility_plugin = fl_accessibility_plugin_new(self);
+  init_scrolling(self);
   self->mouse_cursor_plugin = fl_mouse_cursor_plugin_new(messenger, self);
   self->platform_plugin = fl_platform_plugin_new(messenger);
 

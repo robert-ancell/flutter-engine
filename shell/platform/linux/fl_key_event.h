@@ -41,27 +41,21 @@ typedef struct _FlKeyEvent {
   GdkModifierType state;
   // Keyboard group.
   guint group;
-  // An opaque pointer to the original event.
-  //
-  // This is used when dispatching.  For native events, this is #GdkEvent
-  // pointer.  For unit tests, this is a dummy pointer.
-  gpointer origin;
-  // A callback to free #origin, called in #fl_key_event_dispose.
-  //
-  // Can be nullptr.
-  FlKeyEventDisposeOrigin dispose_origin;
 } FlKeyEvent;
 
 /**
- * fl_key_event_new_from_gdk_event:
- * @event: the #GdkEvent this #FlKeyEvent is based on. The #event must be a
- * #GdkEventKey, and will be destroyed by #fl_key_event_dispose.
+ * fl_key_event_new:
  *
- * Create a new #FlKeyEvent based on a #GdkEvent.
+ * Create a new #FlKeyEvent.
  *
  * Returns: a new #FlKeyEvent. Must be freed with #fl_key_event_dispose.
  */
-FlKeyEvent* fl_key_event_new_from_gdk_event(GdkEvent* event);
+FlKeyEvent* fl_key_event_new(guint32 time,
+                             bool is_press,
+                             guint16 keycode,
+                             guint keyval,
+                             GdkModifierType state,
+                             guint group);
 
 /**
  * fl_key_event_dispose:

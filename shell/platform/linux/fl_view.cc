@@ -29,7 +29,7 @@
 static constexpr int kMicrosecondsPerMillisecond = 1000;
 
 struct _FlView {
-  GtkBox parent_instance;
+  GtkGLArea parent_instance;
 
   // Project being run.
   FlDartProject* project;
@@ -58,7 +58,6 @@ struct _FlView {
   GtkEventController* motion_controller;
   GtkEventController* key_controller;
 
-  GtkGLArea* gl_area;
   GLuint program;
 
   GPtrArray* textures;
@@ -91,7 +90,7 @@ static void fl_view_text_input_delegate_iface_init(
 G_DEFINE_TYPE_WITH_CODE(
     FlView,
     fl_view,
-    GTK_TYPE_BOX,
+    GTK_TYPE_GL_AREA,
     G_IMPLEMENT_INTERFACE(fl_plugin_registry_get_type(),
                           fl_view_plugin_registry_iface_init)
         G_IMPLEMENT_INTERFACE(fl_keyboard_view_delegate_get_type(),
@@ -381,9 +380,9 @@ static gchar* get_program_log(GLuint program) {
 }
 
 static void realize_cb(FlView* self) {
-  gtk_gl_area_make_current(self->gl_area);
+  gtk_gl_area_make_current(GTK_GL_AREA(self));
 
-  GError* gl_error = gtk_gl_area_get_error(self->gl_area);
+  GError* gl_error = gtk_gl_area_get_error(GTK_GL_AREA(self));
   if (gl_error != NULL) {
     g_warning("Failed to initialize GLArea: %s", gl_error->message);
     return;
@@ -450,9 +449,9 @@ static void realize_cb(FlView* self) {
 }
 
 static void unrealize_cb(FlView* self) {
-  gtk_gl_area_make_current(self->gl_area);
+  gtk_gl_area_make_current(GTK_GL_AREA(self));
 
-  GError* gl_error = gtk_gl_area_get_error(self->gl_area);
+  GError* gl_error = gtk_gl_area_get_error(GTK_GL_AREA(self));
   if (gl_error != NULL) {
     g_warning("Failed to cleanup GLArea: %s", gl_error->message);
     return;
@@ -462,7 +461,7 @@ static void unrealize_cb(FlView* self) {
 }
 
 static gboolean render_cb(FlView* self, GdkGLContext* context) {
-  if (gtk_gl_area_get_error(self->gl_area) != NULL) {
+  if (gtk_gl_area_get_error(GTK_GL_AREA(self)) != NULL) {
     return FALSE;
   }
 
@@ -645,18 +644,15 @@ static void fl_view_class_init(FlViewClass* klass) {
 static void fl_view_init(FlView* self) {
   gtk_widget_set_can_focus(GTK_WIDGET(self), TRUE);
 
-  self->gl_area = GTK_GL_AREA(gtk_gl_area_new());
-  g_signal_connect_swapped(self->gl_area, "realize", G_CALLBACK(realize_cb),
+  // FIXME: Don't need signals for these
+  g_signal_connect_swapped(GTK_GL_AREA(self), "realize", G_CALLBACK(realize_cb),
                            self);
-  g_signal_connect_swapped(self->gl_area, "unrealize", G_CALLBACK(unrealize_cb),
+  g_signal_connect_swapped(GTK_GL_AREA(self), "unrealize",
+                           G_CALLBACK(unrealize_cb), self);
+  g_signal_connect_swapped(GTK_GL_AREA(self), "render", G_CALLBACK(render_cb),
                            self);
-  g_signal_connect_swapped(self->gl_area, "render", G_CALLBACK(render_cb),
+  g_signal_connect_swapped(GTK_GL_AREA(self), "resize", G_CALLBACK(resize_cb),
                            self);
-  g_signal_connect_swapped(self->gl_area, "resize", G_CALLBACK(resize_cb),
-                           self);
-  gtk_box_append(GTK_BOX(self), GTK_WIDGET(self->gl_area));
-  gtk_widget_set_hexpand(GTK_WIDGET(self->gl_area), TRUE);
-  gtk_widget_set_vexpand(GTK_WIDGET(self->gl_area), TRUE);
 }
 
 G_MODULE_EXPORT FlView* fl_view_new(FlDartProject* project) {
@@ -677,7 +673,7 @@ void fl_view_set_textures(FlView* self,
   g_clear_pointer(&self->textures, g_ptr_array_unref);
   self->textures = g_ptr_array_ref(textures);
 
-  gtk_widget_queue_draw(GTK_WIDGET(self->gl_area));  // FIXME: queue_render?
+  gtk_widget_queue_draw(GTK_WIDGET(self));  // FIXME: queue_render?
 }
 
 GHashTable* fl_view_get_keyboard_state(FlView* self) {

@@ -460,6 +460,10 @@ static void unrealize_cb(FlView* self) {
   glDeleteProgram(self->program);
 }
 
+static GLfloat pixels_to_gl_coords(GLfloat position, GLfloat pixels) {
+  return (2.0 * position / pixels) - 1.0;
+}
+
 static gboolean render_cb(FlView* self, GdkGLContext* context) {
   if (gtk_gl_area_get_error(GTK_GL_AREA(self)) != NULL) {
     return FALSE;
@@ -469,35 +473,36 @@ static gboolean render_cb(FlView* self, GdkGLContext* context) {
     return TRUE;
   }
 
-  glClearColor(0.5, 0.5, 0.5, 1.0);
+  glClearColor(0.0, 0.0, 0.0, 1.0);
   glClear(GL_COLOR_BUFFER_BIT);
 
   glUseProgram(self->program);
 
+  GLfloat width = gtk_widget_get_width(GTK_WIDGET(self));
+  GLfloat height = gtk_widget_get_height(GTK_WIDGET(self));
+
   for (guint i = 0; i < self->textures->len; i++) {
     FlBackingStoreProvider* texture =
         FL_BACKING_STORE_PROVIDER(g_ptr_array_index(self->textures, i));
+
     uint32_t texture_id = fl_backing_store_provider_get_gl_texture_id(texture);
-    // GdkRectangle geometry = fl_backing_store_provider_get_geometry(texture);
-
-    // FIXME: scale?
-
-    // GLfloat x = geometry.x;
-    // GLfloat y = geometry.y;
-    // GLfloat width = geometry.width;
-    // GLfloat height = geometry.height;
-    // GLfloat vertices[12] = {x,         y,          x + width, y,
-    //                          x + width, y + height, x,         y,
-    //                          x + width, y + height, x,         y + height};
-    // glVertexPointer(2, GL_FLOAT, sizeof(GLfloat) * 2, vertices);
-    // glTexCoordPointer(2, GL_FLOAT, sizeof(GLfloat) * 2, tex_coords);
-    // glEnableClientState(GL_VERTEX_ARRAY);
-    // glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-    static const GLfloat vertex_data[] = {-1, -1, 0, 0, 1,  1,  1, 1,
-                                          -1, 1,  0, 1, -1, -1, 0, 0,
-                                          1,  -1, 1, 0, 1,  1,  1, 1};
-
     glBindTexture(GL_TEXTURE_2D, texture_id);
+
+    // Translate into OpenGL co-ordinates
+    // FIXME: scale?
+    GdkRectangle texture_geometry =
+        fl_backing_store_provider_get_geometry(texture);
+    GLfloat texture_x = texture_geometry.x;
+    GLfloat texture_y = texture_geometry.y;
+    GLfloat texture_width = texture_geometry.width;
+    GLfloat texture_height = texture_geometry.height;
+    GLfloat x0 = pixels_to_gl_coords(texture_x, width);
+    GLfloat y0 =
+        pixels_to_gl_coords(height - (texture_y + texture_height), height);
+    GLfloat x1 = pixels_to_gl_coords(texture_x + texture_width, width);
+    GLfloat y1 = pixels_to_gl_coords(height - texture_y, height);
+    GLfloat vertex_data[] = {x0, y0, 0, 0, x1, y1, 1, 1, x0, y1, 0, 1,
+                             x0, y0, 0, 0, x1, y0, 1, 0, x1, y1, 1, 1};
 
     GLuint vao, vertex_buffer;
     glGenVertexArrays(1, &vao);

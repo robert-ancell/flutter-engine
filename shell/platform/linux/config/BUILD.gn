@@ -13,10 +13,6 @@ pkg_config("gtk") {
   packages = [ "gtk4" ]
 }
 
-pkg_config("gl") {
-  packages = [ "gl" ]
-}
-
 pkg_config("egl") {
   packages = [ "egl" ]
 }

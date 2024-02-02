@@ -379,162 +379,8 @@ static gchar* get_program_log(GLuint program) {
   return log;
 }
 
-static void realize_cb(FlView* self) {
-  gtk_gl_area_make_current(GTK_GL_AREA(self));
-
-  GError* gl_error = gtk_gl_area_get_error(GTK_GL_AREA(self));
-  if (gl_error != NULL) {
-    g_warning("Failed to initialize GLArea: %s", gl_error->message);
-    return;
-  }
-
-  GLuint vertex_shader = glCreateShader(GL_VERTEX_SHADER);
-  glShaderSource(vertex_shader, 1, &vertex_shader_src, NULL);
-  glCompileShader(vertex_shader);
-  int vertex_compile_status;
-  glGetShaderiv(vertex_shader, GL_COMPILE_STATUS, &vertex_compile_status);
-  if (vertex_compile_status == GL_FALSE) {
-    g_autofree gchar* shader_log = get_shader_log(vertex_shader);
-    g_warning("Failed to compile vertex shader: %s", shader_log);
-  }
-
-  GLuint fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
-  glShaderSource(fragment_shader, 1, &fragment_shader_src, NULL);
-  glCompileShader(fragment_shader);
-  int fragment_compile_status;
-  glGetShaderiv(fragment_shader, GL_COMPILE_STATUS, &fragment_compile_status);
-  if (fragment_compile_status == GL_FALSE) {
-    g_autofree gchar* shader_log = get_shader_log(fragment_shader);
-    g_warning("Failed to compile fragment shader: %s", shader_log);
-  }
-
-  self->program = glCreateProgram();
-  glAttachShader(self->program, vertex_shader);
-  glAttachShader(self->program, fragment_shader);
-  glLinkProgram(self->program);
-
-  int link_status;
-  glGetProgramiv(self->program, GL_LINK_STATUS, &link_status);
-  if (link_status == GL_FALSE) {
-    g_autofree gchar* program_log = get_program_log(self->program);
-    g_warning("Failed to link program: %s", program_log);
-  }
-
-  glDeleteShader(vertex_shader);
-  glDeleteShader(fragment_shader);
-
-  // Handle requests by the user to close the application.
-  // GtkWidget* toplevel_window = gtk_widget_get_toplevel(GTK_WIDGET(self));
-
-  // Listen to window state changes.
-  // FIXME: How to do in GTK4
-
-  // g_signal_connect(toplevel_window, "delete-event",
-  //                  G_CALLBACK(window_delete_event_cb), self);
-
-  // FIXME: gtk_gl_area_set_error
-
-  init_keyboard(self);
-
-  g_autoptr(GError) error = nullptr;
-  if (!fl_renderer_start(self->renderer, self, &error)) {
-    g_warning("Failed to start Flutter renderer: %s", error->message);
-    return;
-  }
-
-  if (!fl_engine_start(self->engine, &error)) {
-    g_warning("Failed to start Flutter engine: %s", error->message);
-    return;
-  }
-}
-
-static void unrealize_cb(FlView* self) {
-  gtk_gl_area_make_current(GTK_GL_AREA(self));
-
-  GError* gl_error = gtk_gl_area_get_error(GTK_GL_AREA(self));
-  if (gl_error != NULL) {
-    g_warning("Failed to cleanup GLArea: %s", gl_error->message);
-    return;
-  }
-
-  glDeleteProgram(self->program);
-}
-
 static GLfloat pixels_to_gl_coords(GLfloat position, GLfloat pixels) {
   return (2.0 * position / pixels) - 1.0;
-}
-
-static gboolean render_cb(FlView* self, GdkGLContext* context) {
-  if (gtk_gl_area_get_error(GTK_GL_AREA(self)) != NULL) {
-    return FALSE;
-  }
-
-  if (self->textures == nullptr) {
-    return TRUE;
-  }
-
-  glClearColor(0.0, 0.0, 0.0, 1.0);
-  glClear(GL_COLOR_BUFFER_BIT);
-
-  glUseProgram(self->program);
-
-  GLfloat width = gtk_widget_get_width(GTK_WIDGET(self));
-  GLfloat height = gtk_widget_get_height(GTK_WIDGET(self));
-
-  for (guint i = 0; i < self->textures->len; i++) {
-    FlBackingStoreProvider* texture =
-        FL_BACKING_STORE_PROVIDER(g_ptr_array_index(self->textures, i));
-
-    uint32_t texture_id = fl_backing_store_provider_get_gl_texture_id(texture);
-    glBindTexture(GL_TEXTURE_2D, texture_id);
-
-    // Translate into OpenGL co-ordinates
-    // FIXME: scale?
-    GdkRectangle texture_geometry =
-        fl_backing_store_provider_get_geometry(texture);
-    GLfloat texture_x = texture_geometry.x;
-    GLfloat texture_y = texture_geometry.y;
-    GLfloat texture_width = texture_geometry.width;
-    GLfloat texture_height = texture_geometry.height;
-    GLfloat x0 = pixels_to_gl_coords(texture_x, width);
-    GLfloat y0 =
-        pixels_to_gl_coords(height - (texture_y + texture_height), height);
-    GLfloat x1 = pixels_to_gl_coords(texture_x + texture_width, width);
-    GLfloat y1 = pixels_to_gl_coords(height - texture_y, height);
-    GLfloat vertex_data[] = {x0, y0, 0, 0, x1, y1, 1, 1, x0, y1, 0, 1,
-                             x0, y0, 0, 0, x1, y0, 1, 0, x1, y1, 1, 1};
-
-    GLuint vao, vertex_buffer;
-    glGenVertexArrays(1, &vao);
-    glBindVertexArray(vao);
-    glGenBuffers(1, &vertex_buffer);
-    glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertex_data), vertex_data,
-                 GL_STATIC_DRAW);
-    GLint position_index = glGetAttribLocation(self->program, "position");
-    glEnableVertexAttribArray(position_index);
-    glVertexAttribPointer(position_index, 2, GL_FLOAT, GL_FALSE,
-                          sizeof(GLfloat) * 4, 0);
-    GLint texcoord_index = glGetAttribLocation(self->program, "in_texcoord");
-    glEnableVertexAttribArray(texcoord_index);
-    glVertexAttribPointer(texcoord_index, 2, GL_FLOAT, GL_FALSE,
-                          sizeof(GLfloat) * 4, (void*)(sizeof(GLfloat) * 2));
-
-    glDrawArrays(GL_TRIANGLES, 0, 6);
-
-    glDeleteVertexArrays(1, &vao);
-    glDeleteBuffers(1, &vertex_buffer);
-  }
-
-  glFlush();
-
-  return TRUE;
-}
-
-static void resize_cb(FlView* self, int width, int height) {
-  gint scale_factor = gtk_widget_get_scale_factor(GTK_WIDGET(self));
-  fl_engine_send_window_metrics_event(self->engine, width * scale_factor,
-                                      height * scale_factor, scale_factor);
 }
 
 static void fl_view_constructed(GObject* object) {
@@ -629,6 +475,174 @@ static void fl_view_dispose(GObject* object) {
   G_OBJECT_CLASS(fl_view_parent_class)->dispose(object);
 }
 
+static void fl_view_realize(GtkWidget* widget) {
+  FlView* self = FL_VIEW(widget);
+
+  GTK_WIDGET_CLASS(fl_view_parent_class)->realize(widget);
+
+  gtk_gl_area_make_current(GTK_GL_AREA(self));
+
+  GError* gl_error = gtk_gl_area_get_error(GTK_GL_AREA(self));
+  if (gl_error != NULL) {
+    g_warning("Failed to initialize GLArea: %s", gl_error->message);
+    return;
+  }
+
+  GLuint vertex_shader = glCreateShader(GL_VERTEX_SHADER);
+  glShaderSource(vertex_shader, 1, &vertex_shader_src, NULL);
+  glCompileShader(vertex_shader);
+  int vertex_compile_status;
+  glGetShaderiv(vertex_shader, GL_COMPILE_STATUS, &vertex_compile_status);
+  if (vertex_compile_status == GL_FALSE) {
+    g_autofree gchar* shader_log = get_shader_log(vertex_shader);
+    g_warning("Failed to compile vertex shader: %s", shader_log);
+  }
+
+  GLuint fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
+  glShaderSource(fragment_shader, 1, &fragment_shader_src, NULL);
+  glCompileShader(fragment_shader);
+  int fragment_compile_status;
+  glGetShaderiv(fragment_shader, GL_COMPILE_STATUS, &fragment_compile_status);
+  if (fragment_compile_status == GL_FALSE) {
+    g_autofree gchar* shader_log = get_shader_log(fragment_shader);
+    g_warning("Failed to compile fragment shader: %s", shader_log);
+  }
+
+  self->program = glCreateProgram();
+  glAttachShader(self->program, vertex_shader);
+  glAttachShader(self->program, fragment_shader);
+  glLinkProgram(self->program);
+
+  int link_status;
+  glGetProgramiv(self->program, GL_LINK_STATUS, &link_status);
+  if (link_status == GL_FALSE) {
+    g_autofree gchar* program_log = get_program_log(self->program);
+    g_warning("Failed to link program: %s", program_log);
+  }
+
+  glDeleteShader(vertex_shader);
+  glDeleteShader(fragment_shader);
+
+  // Handle requests by the user to close the application.
+  // GtkWidget* toplevel_window = gtk_widget_get_toplevel(GTK_WIDGET(self));
+
+  // Listen to window state changes.
+  // FIXME: How to do in GTK4
+
+  // g_signal_connect(toplevel_window, "delete-event",
+  //                  G_CALLBACK(window_delete_event_cb), self);
+
+  // FIXME: gtk_gl_area_set_error
+
+  init_keyboard(self);
+
+  g_autoptr(GError) error = nullptr;
+  if (!fl_renderer_start(self->renderer, self, &error)) {
+    g_warning("Failed to start Flutter renderer: %s", error->message);
+    return;
+  }
+
+  if (!fl_engine_start(self->engine, &error)) {
+    g_warning("Failed to start Flutter engine: %s", error->message);
+    return;
+  }
+}
+
+static void fl_view_unrealize(GtkWidget* widget) {
+  FlView* self = FL_VIEW(widget);
+
+  GTK_WIDGET_CLASS(fl_view_parent_class)->unrealize(widget);
+
+  gtk_gl_area_make_current(GTK_GL_AREA(self));
+
+  GError* gl_error = gtk_gl_area_get_error(GTK_GL_AREA(self));
+  if (gl_error != NULL) {
+    g_warning("Failed to cleanup GLArea: %s", gl_error->message);
+    return;
+  }
+
+  glDeleteProgram(self->program);
+}
+
+static gboolean fl_view_render(GtkGLArea* gl_area, GdkGLContext* context) {
+  FlView* self = FL_VIEW(gl_area);
+
+  if (gtk_gl_area_get_error(GTK_GL_AREA(self)) != NULL) {
+    return FALSE;
+  }
+
+  if (self->textures == nullptr) {
+    return TRUE;
+  }
+
+  glClearColor(0.0, 0.0, 0.0, 1.0);
+  glClear(GL_COLOR_BUFFER_BIT);
+
+  glUseProgram(self->program);
+
+  GLfloat width = gtk_widget_get_width(GTK_WIDGET(self));
+  GLfloat height = gtk_widget_get_height(GTK_WIDGET(self));
+
+  for (guint i = 0; i < self->textures->len; i++) {
+    FlBackingStoreProvider* texture =
+        FL_BACKING_STORE_PROVIDER(g_ptr_array_index(self->textures, i));
+
+    uint32_t texture_id = fl_backing_store_provider_get_gl_texture_id(texture);
+    glBindTexture(GL_TEXTURE_2D, texture_id);
+
+    // Translate into OpenGL co-ordinates
+    // FIXME: scale?
+    GdkRectangle texture_geometry =
+        fl_backing_store_provider_get_geometry(texture);
+    GLfloat texture_x = texture_geometry.x;
+    GLfloat texture_y = texture_geometry.y;
+    GLfloat texture_width = texture_geometry.width;
+    GLfloat texture_height = texture_geometry.height;
+    GLfloat x0 = pixels_to_gl_coords(texture_x, width);
+    GLfloat y0 =
+        pixels_to_gl_coords(height - (texture_y + texture_height), height);
+    GLfloat x1 = pixels_to_gl_coords(texture_x + texture_width, width);
+    GLfloat y1 = pixels_to_gl_coords(height - texture_y, height);
+    GLfloat vertex_data[] = {x0, y0, 0, 0, x1, y1, 1, 1, x0, y1, 0, 1,
+                             x0, y0, 0, 0, x1, y0, 1, 0, x1, y1, 1, 1};
+
+    GLuint vao, vertex_buffer;
+    glGenVertexArrays(1, &vao);
+    glBindVertexArray(vao);
+    glGenBuffers(1, &vertex_buffer);
+    glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertex_data), vertex_data,
+                 GL_STATIC_DRAW);
+    GLint position_index = glGetAttribLocation(self->program, "position");
+    glEnableVertexAttribArray(position_index);
+    glVertexAttribPointer(position_index, 2, GL_FLOAT, GL_FALSE,
+                          sizeof(GLfloat) * 4, 0);
+    GLint texcoord_index = glGetAttribLocation(self->program, "in_texcoord");
+    glEnableVertexAttribArray(texcoord_index);
+    glVertexAttribPointer(texcoord_index, 2, GL_FLOAT, GL_FALSE,
+                          sizeof(GLfloat) * 4, (void*)(sizeof(GLfloat) * 2));
+
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+
+    glDeleteVertexArrays(1, &vao);
+    glDeleteBuffers(1, &vertex_buffer);
+  }
+
+  glFlush();
+
+  return TRUE;
+}
+
+static void fl_view_resize(GtkGLArea* gl_area, int width, int height) {
+  FlView* self = FL_VIEW(gl_area);
+
+  GTK_GL_AREA_CLASS(fl_view_parent_class)->resize(gl_area, width, height);
+
+  gint scale_factor = gtk_widget_get_scale_factor(GTK_WIDGET(self));
+  fl_engine_send_window_metrics_event(self->engine, width * scale_factor,
+                                      height * scale_factor, scale_factor);
+}
+
 static void fl_view_class_init(FlViewClass* klass) {
   GObjectClass* object_class = G_OBJECT_CLASS(klass);
   object_class->constructed = fl_view_constructed;
@@ -636,6 +650,14 @@ static void fl_view_class_init(FlViewClass* klass) {
   object_class->get_property = fl_view_get_property;
   // object_class->notify = fl_view_notify;
   object_class->dispose = fl_view_dispose;
+
+  GtkWidgetClass* widget_class = GTK_WIDGET_CLASS(klass);
+  widget_class->realize = fl_view_realize;
+  widget_class->unrealize = fl_view_unrealize;
+
+  GtkGLAreaClass* gl_area_class = GTK_GL_AREA_CLASS(klass);
+  gl_area_class->render = fl_view_render;
+  gl_area_class->resize = fl_view_resize;
 
   g_object_class_install_property(
       G_OBJECT_CLASS(klass), kPropFlutterProject,
@@ -648,16 +670,6 @@ static void fl_view_class_init(FlViewClass* klass) {
 
 static void fl_view_init(FlView* self) {
   gtk_widget_set_can_focus(GTK_WIDGET(self), TRUE);
-
-  // FIXME: Don't need signals for these
-  g_signal_connect_swapped(GTK_GL_AREA(self), "realize", G_CALLBACK(realize_cb),
-                           self);
-  g_signal_connect_swapped(GTK_GL_AREA(self), "unrealize",
-                           G_CALLBACK(unrealize_cb), self);
-  g_signal_connect_swapped(GTK_GL_AREA(self), "render", G_CALLBACK(render_cb),
-                           self);
-  g_signal_connect_swapped(GTK_GL_AREA(self), "resize", G_CALLBACK(resize_cb),
-                           self);
 }
 
 G_MODULE_EXPORT FlView* fl_view_new(FlDartProject* project) {

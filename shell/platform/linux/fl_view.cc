@@ -54,8 +54,10 @@ struct _FlView {
   FlMouseCursorPlugin* mouse_cursor_plugin;
   FlPlatformPlugin* platform_plugin;
 
+  GtkIMContext* im_context;
   GtkGesture* click_gesture;
   GtkEventController* motion_controller;
+  GtkEventController* focus_controller;
   GtkEventController* key_controller;
 
   GLuint program;
@@ -115,14 +117,13 @@ static gboolean window_delete_event_cb(GtkWidget* widget,
 static void init_keyboard(FlView* self) {
   FlBinaryMessenger* messenger = fl_engine_get_binary_messenger(self->engine);
 
-  // GdkWindow* window =
-  //     gtk_widget_get_window(gtk_widget_get_toplevel(GTK_WIDGET(self)));
-  // g_return_if_fail(GDK_IS_WINDOW(window));
-  // g_autoptr(GtkIMContext) im_context = gtk_im_multicontext_new();
-  // gtk_im_context_set_client_window(im_context, window);
+  g_clear_object(&self->im_context);
+  self->im_context = gtk_im_multicontext_new();
+  gtk_im_context_set_client_widget(self->im_context, GTK_WIDGET(self));
 
-  // self->text_input_plugin = fl_text_input_plugin_new(
-  //     messenger, im_context, FL_TEXT_INPUT_VIEW_DELEGATE(self));
+  // FIXME: Leaks old plugin?
+  self->text_input_plugin = fl_text_input_plugin_new(
+      messenger, self->im_context, FL_TEXT_INPUT_VIEW_DELEGATE(self));
   self->keyboard_manager =
       fl_keyboard_manager_new(messenger, FL_KEYBOARD_VIEW_DELEGATE(self));
 }
@@ -290,14 +291,14 @@ static void primary_released_cb(FlView* self, int n_press, double x, double y) {
                            x, y);
 }
 
-static void enter_cb(FlView* self, gdouble x, gdouble y) {
+static void motion_enter_cb(FlView* self, gdouble x, gdouble y) {
   send_mouse_pointer_event(
       self, kAdd,
       gtk_event_controller_get_current_event_time(self->motion_controller), x,
       y);
 }
 
-static void leave_cb(FlView* self) {
+static void motion_leave_cb(FlView* self) {
   send_mouse_pointer_event(
       self, kRemove,
       gtk_event_controller_get_current_event_time(self->motion_controller), 0,
@@ -309,6 +310,21 @@ static void motion_cb(FlView* self, gdouble x, gdouble y) {
       self, self->button_state != 0 ? kMove : kHover,
       gtk_event_controller_get_current_event_time(self->motion_controller), x,
       y);
+}
+
+static void update_window_state(FlView* self) {
+  fl_engine_send_window_state_event(
+      self->engine, TRUE,
+      gtk_event_controller_focus_is_focus(
+          GTK_EVENT_CONTROLLER_FOCUS(self->focus_controller)));
+}
+
+static void focus_enter_cb(FlView* self) {
+  update_window_state(self);
+}
+
+static void focus_leave_cb(FlView* self) {
+  update_window_state(self);
 }
 
 static gboolean key_pressed_cb(FlView* self,
@@ -410,12 +426,19 @@ static void fl_view_constructed(GObject* object) {
 
   self->motion_controller = gtk_event_controller_motion_new();
   g_signal_connect_swapped(self->motion_controller, "enter",
-                           G_CALLBACK(enter_cb), self);
+                           G_CALLBACK(motion_enter_cb), self);
   g_signal_connect_swapped(self->motion_controller, "leave",
-                           G_CALLBACK(leave_cb), self);
+                           G_CALLBACK(motion_leave_cb), self);
   g_signal_connect_swapped(self->motion_controller, "motion",
                            G_CALLBACK(motion_cb), self);
   gtk_widget_add_controller(GTK_WIDGET(self), self->motion_controller);
+
+  self->focus_controller = gtk_event_controller_focus_new();
+  g_signal_connect_swapped(self->focus_controller, "enter",
+                           G_CALLBACK(focus_enter_cb), self);
+  g_signal_connect_swapped(self->focus_controller, "leave",
+                           G_CALLBACK(focus_leave_cb), self);
+  gtk_widget_add_controller(GTK_WIDGET(self), self->focus_controller);
 
   self->key_controller = gtk_event_controller_key_new();
   g_signal_connect_swapped(self->key_controller, "key-pressed",
@@ -467,9 +490,7 @@ static void fl_view_dispose(GObject* object) {
   // g_clear_object(&self->accessibility_plugin);
   g_clear_object(&self->mouse_cursor_plugin);
   g_clear_object(&self->platform_plugin);
-  // g_clear_object(&self->click_gesture); // FIXME: Required?
-  // g_clear_object(&self->motion_controller);
-  // g_clear_object(&self->key_controller);
+  g_clear_object(&self->im_context);
   g_clear_pointer(&self->textures, g_ptr_array_unref);
 
   G_OBJECT_CLASS(fl_view_parent_class)->dispose(object);
@@ -669,7 +690,7 @@ static void fl_view_class_init(FlViewClass* klass) {
 }
 
 static void fl_view_init(FlView* self) {
-  gtk_widget_set_can_focus(GTK_WIDGET(self), TRUE);
+  gtk_widget_set_focusable(GTK_WIDGET(self), TRUE);
 }
 
 G_MODULE_EXPORT FlView* fl_view_new(FlDartProject* project) {

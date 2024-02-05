@@ -334,8 +334,9 @@ static gboolean im_retrieve_surrounding_cb(FlTextInputPlugin* self) {
       fl_text_input_plugin_get_instance_private(self));
   auto text = priv->text_model->GetText();
   size_t cursor_offset = priv->text_model->GetCursorOffset();
-  gtk_im_context_set_surrounding(priv->im_context, text.c_str(), -1,
-                                 cursor_offset);
+  // FIXME: Check anchor_index
+  gtk_im_context_set_surrounding_with_selection(priv->im_context, text.c_str(), -1,
+                                 cursor_offset, cursor_offset);
   return TRUE;
 }
 

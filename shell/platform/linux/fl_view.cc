@@ -199,6 +199,7 @@ static void fl_view_keyboard_delegate_iface_init(
   iface->redispatch_event = [](FlKeyboardViewDelegate* view_delegate,
                                std::unique_ptr<FlKeyEvent> in_event) {
     FlKeyEvent* event = in_event.release();
+    g_printerr("redispatch_event\n");
     // GdkEvent* gdk_event = reinterpret_cast<GdkEvent*>(event->origin);
     // GdkEventType event_type = gdk_event_get_event_type(gdk_event);
     // g_return_if_fail(event_type == GDK_KEY_PRESS ||
@@ -215,6 +216,8 @@ static void fl_view_keyboard_delegate_iface_init(
 
   iface->lookup_key = [](FlKeyboardViewDelegate* view_delegate,
                          const GdkKeymapKey* key) -> guint {
+    g_printerr("lookup_key\n");
+    // FIXME: API no longer available
     // FlView* self = FL_VIEW(view_delegate);
     // g_return_val_if_fail(self->keymap != nullptr, 0);
     return 0;  // gdk_keymap_lookup_key(self->keymap, key);
@@ -258,6 +261,7 @@ static void fl_view_text_input_delegate_iface_init(
   iface->translate_coordinates = [](FlTextInputViewDelegate* delegate,
                                     gint view_x, gint view_y, gint* window_x,
                                     gint* window_y) {
+    g_printerr("translate_coordinates\n");
     // FlView* self = FL_VIEW(delegate);
     // gtk_widget_translate_coordinates(GTK_WIDGET(self),
     //                                  gtk_widget_get_toplevel(GTK_WIDGET(self)),
@@ -291,14 +295,14 @@ static void primary_released_cb(FlView* self, int n_press, double x, double y) {
                            x, y);
 }
 
-static void motion_enter_cb(FlView* self, gdouble x, gdouble y) {
+static void enter_cb(FlView* self, gdouble x, gdouble y) {
   send_mouse_pointer_event(
       self, kAdd,
       gtk_event_controller_get_current_event_time(self->motion_controller), x,
       y);
 }
 
-static void motion_leave_cb(FlView* self) {
+static void leave_cb(FlView* self) {
   send_mouse_pointer_event(
       self, kRemove,
       gtk_event_controller_get_current_event_time(self->motion_controller), 0,
@@ -313,17 +317,16 @@ static void motion_cb(FlView* self, gdouble x, gdouble y) {
 }
 
 static void update_window_state(FlView* self) {
+  g_printerr("update_window_state %d\n",
+             gtk_event_controller_focus_is_focus(
+                 GTK_EVENT_CONTROLLER_FOCUS(self->focus_controller)));
   fl_engine_send_window_state_event(
       self->engine, TRUE,
       gtk_event_controller_focus_is_focus(
           GTK_EVENT_CONTROLLER_FOCUS(self->focus_controller)));
 }
 
-static void focus_enter_cb(FlView* self) {
-  update_window_state(self);
-}
-
-static void focus_leave_cb(FlView* self) {
+static void focus_changed_cb(FlView* self) {
   update_window_state(self);
 }
 
@@ -331,13 +334,15 @@ static gboolean key_pressed_cb(FlView* self,
                                guint keyval,
                                guint keycode,
                                GdkModifierType state) {
-  return fl_keyboard_manager_handle_event(
+  fl_keyboard_manager_handle_event(
       self->keyboard_manager,
       fl_key_event_new(
           gtk_event_controller_get_current_event_time(self->key_controller),
           TRUE, keycode, keyval, state,
           gtk_event_controller_key_get_group(
               GTK_EVENT_CONTROLLER_KEY(self->key_controller))));
+
+  return FALSE;
 }
 
 static void key_released_cb(FlView* self,
@@ -426,18 +431,16 @@ static void fl_view_constructed(GObject* object) {
 
   self->motion_controller = gtk_event_controller_motion_new();
   g_signal_connect_swapped(self->motion_controller, "enter",
-                           G_CALLBACK(motion_enter_cb), self);
+                           G_CALLBACK(enter_cb), self);
   g_signal_connect_swapped(self->motion_controller, "leave",
-                           G_CALLBACK(motion_leave_cb), self);
+                           G_CALLBACK(leave_cb), self);
   g_signal_connect_swapped(self->motion_controller, "motion",
                            G_CALLBACK(motion_cb), self);
   gtk_widget_add_controller(GTK_WIDGET(self), self->motion_controller);
 
   self->focus_controller = gtk_event_controller_focus_new();
-  g_signal_connect_swapped(self->focus_controller, "enter",
-                           G_CALLBACK(focus_enter_cb), self);
-  g_signal_connect_swapped(self->focus_controller, "leave",
-                           G_CALLBACK(focus_leave_cb), self);
+  g_signal_connect_swapped(self->focus_controller, "notify::is-focus",
+                           G_CALLBACK(focus_changed_cb), self);
   gtk_widget_add_controller(GTK_WIDGET(self), self->focus_controller);
 
   self->key_controller = gtk_event_controller_key_new();

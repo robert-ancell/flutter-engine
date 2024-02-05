@@ -121,7 +121,7 @@ GeometryResult ComputeUVGeometryForRect(Rect source_rect,
 
   // Calculate UV-specific transform based on texture coverage and effect.
   // For example, if the texture is 100x100 and the effect transform is
-  // scaling by 0.2, texture_bounds.GetNormalizingTransform() will result in a
+  // scaling by 2.0, texture_bounds.GetNormalizingTransform() will result in a
   // Matrix that scales by 0.01, and then if the effect_transform is
   // Matrix::MakeScale(Vector2{2, 2}), the resulting uv_transform will have x
   // and y basis vectors with scale 0.02.
@@ -171,9 +171,9 @@ GeometryResult Geometry::GetPositionUVBuffer(Rect texture_coverage,
 }
 
 std::shared_ptr<Geometry> Geometry::MakeFillPath(
-    Path path,
+    const Path& path,
     std::optional<Rect> inner_rect) {
-  return std::make_shared<FillPathGeometry>(std::move(path), inner_rect);
+  return std::make_shared<FillPathGeometry>(path, inner_rect);
 }
 
 std::shared_ptr<Geometry> Geometry::MakePointField(std::vector<Point> points,
@@ -182,7 +182,7 @@ std::shared_ptr<Geometry> Geometry::MakePointField(std::vector<Point> points,
   return std::make_shared<PointFieldGeometry>(std::move(points), radius, round);
 }
 
-std::shared_ptr<Geometry> Geometry::MakeStrokePath(Path path,
+std::shared_ptr<Geometry> Geometry::MakeStrokePath(const Path& path,
                                                    Scalar stroke_width,
                                                    Scalar miter_limit,
                                                    Cap stroke_cap,
@@ -191,8 +191,8 @@ std::shared_ptr<Geometry> Geometry::MakeStrokePath(Path path,
   if (miter_limit < 0) {
     miter_limit = 4.0;
   }
-  return std::make_shared<StrokePathGeometry>(
-      std::move(path), stroke_width, miter_limit, stroke_cap, stroke_join);
+  return std::make_shared<StrokePathGeometry>(path, stroke_width, miter_limit,
+                                              stroke_cap, stroke_join);
 }
 
 std::shared_ptr<Geometry> Geometry::MakeCover() {

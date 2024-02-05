@@ -2,4 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "flutter/fml/thread_local.h"
+out vec4 frag_color;
+
+layout(input_attachment_index = 0) uniform subpassInputMS subpass_input;
+
+void main() {
+  frag_color = subpassLoad(subpass_input, 0).gbra;
+}

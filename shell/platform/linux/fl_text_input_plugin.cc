@@ -627,10 +627,10 @@ static gboolean fl_text_input_plugin_filter_keypress_default(
     return FALSE;
   }
 
-  // FIXME
-  // if (gtk_im_context_filter_key(priv->im_context, ...)) {
-  //   return TRUE;
-  // }
+  GdkEventKey* key_event = reinterpret_cast<GdkEventKey*>(event->origin);
+  if (gtk_im_context_filter_keypress(priv->im_context, key_event)) {
+    return TRUE;
+  }
 
   std::string text_before_change = priv->text_model->GetText();
   flutter::TextRange selection_before_change = priv->text_model->selection();

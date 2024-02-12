@@ -8,15 +8,6 @@
 #include <gdk/gdk.h>
 
 /**
- * FlKeyEventDispose:
- * @origin: the #FlKeyEvent::origin to dispose.
- *
- * The signature for #FlKeyEvent::dispose_origin, which
- * frees #FlKeyEvent::origin.
- **/
-typedef void (*FlKeyEventDisposeOrigin)(gpointer origin);
-
-/**
  * FlKeyEvent:
  * A struct that stores information from GdkEvent.
  *
@@ -41,21 +32,19 @@ typedef struct _FlKeyEvent {
   GdkModifierType state;
   // Keyboard group.
   guint group;
+  // The original event.
+  GdkEvent* origin;
 } FlKeyEvent;
 
 /**
- * fl_key_event_new:
+ * fl_key_event_new_from_gdk_event:
+ * @event: the #GdkEvent this #FlKeyEvent is based on.
  *
- * Create a new #FlKeyEvent.
+ * Create a new #FlKeyEvent based on a #GdkEvent.
  *
  * Returns: a new #FlKeyEvent. Must be freed with #fl_key_event_dispose.
  */
-FlKeyEvent* fl_key_event_new(guint32 time,
-                             bool is_press,
-                             guint16 keycode,
-                             guint keyval,
-                             GdkModifierType state,
-                             guint group);
+FlKeyEvent* fl_key_event_new_from_gdk_event(GdkEvent* event);
 
 /**
  * fl_key_event_dispose:

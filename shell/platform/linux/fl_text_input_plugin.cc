@@ -335,8 +335,8 @@ static gboolean im_retrieve_surrounding_cb(FlTextInputPlugin* self) {
   auto text = priv->text_model->GetText();
   size_t cursor_offset = priv->text_model->GetCursorOffset();
   // FIXME: Check anchor_index
-  gtk_im_context_set_surrounding_with_selection(priv->im_context, text.c_str(), -1,
-                                 cursor_offset, cursor_offset);
+  gtk_im_context_set_surrounding_with_selection(
+      priv->im_context, text.c_str(), -1, cursor_offset, cursor_offset);
   return TRUE;
 }
 
@@ -627,8 +627,7 @@ static gboolean fl_text_input_plugin_filter_keypress_default(
     return FALSE;
   }
 
-  GdkEventKey* key_event = reinterpret_cast<GdkEventKey*>(event->origin);
-  if (gtk_im_context_filter_keypress(priv->im_context, key_event)) {
+  if (gtk_im_context_filter_keypress(priv->im_context, event->origin)) {
     return TRUE;
   }
 

@@ -69,7 +69,6 @@ struct _FlView {
 
   /* FlKeyboardViewDelegate related properties */
   KeyboardLayoutNotifier keyboard_layout_notifier;
-  // GdkKeymap* keymap;
   gulong keymap_keys_changed_cb_id;  // Signal connection ID for
                                      // keymap-keys-changed
   gulong window_state_cb_id;  // Signal connection ID for window-state-changed
@@ -199,12 +198,7 @@ static void fl_view_keyboard_delegate_iface_init(
   iface->redispatch_event = [](FlKeyboardViewDelegate* view_delegate,
                                std::unique_ptr<FlKeyEvent> in_event) {
     FlKeyEvent* event = in_event.release();
-    g_printerr("redispatch_event\n");
-    // GdkEvent* gdk_event = reinterpret_cast<GdkEvent*>(event->origin);
-    // GdkEventType event_type = gdk_event_get_event_type(gdk_event);
-    // g_return_if_fail(event_type == GDK_KEY_PRESS ||
-    //                  event_type == GDK_KEY_RELEASE);
-    //  gdk_event_put(gdk_event);
+    // This is not supported in GTK4
     fl_key_event_dispose(event);
   };
 
@@ -216,11 +210,18 @@ static void fl_view_keyboard_delegate_iface_init(
 
   iface->lookup_key = [](FlKeyboardViewDelegate* view_delegate,
                          const GdkKeymapKey* key) -> guint {
-    g_printerr("lookup_key\n");
-    // FIXME: API no longer available
-    // FlView* self = FL_VIEW(view_delegate);
-    // g_return_val_if_fail(self->keymap != nullptr, 0);
-    return 0;  // gdk_keymap_lookup_key(self->keymap, key);
+    FlView* self = FL_VIEW(view_delegate);
+    int n_entries;
+    g_autofree GdkKeymapKey* keys = NULL;
+    g_autofree guint* keyvals = NULL;
+    if (!gdk_display_map_keycode(gtk_widget_get_display(GTK_WIDGET(self)),
+                                 key->keycode, &keys, &keyvals, &n_entries)) {
+      g_printerr("lookup_key %d -> fail\n", key->keycode);
+      return 0;
+    }
+    g_printerr("lookup_key %d -> %d (%d)\n", key->keycode, keyvals[0],
+               n_entries);
+    return keyvals[0];
   };
 
   iface->get_keyboard_state =
@@ -266,6 +267,8 @@ static void fl_view_text_input_delegate_iface_init(
     // gtk_widget_translate_coordinates(GTK_WIDGET(self),
     //                                  gtk_widget_get_toplevel(GTK_WIDGET(self)),
     //                                  view_x, view_y, window_x, window_y);
+    *window_x = view_x;
+    *window_y = view_y;
   };
 }
 
@@ -317,9 +320,6 @@ static void motion_cb(FlView* self, gdouble x, gdouble y) {
 }
 
 static void update_window_state(FlView* self) {
-  g_printerr("update_window_state %d\n",
-             gtk_event_controller_focus_is_focus(
-                 GTK_EVENT_CONTROLLER_FOCUS(self->focus_controller)));
   fl_engine_send_window_state_event(
       self->engine, TRUE,
       gtk_event_controller_focus_is_focus(
@@ -330,32 +330,14 @@ static void focus_changed_cb(FlView* self) {
   update_window_state(self);
 }
 
-static gboolean key_pressed_cb(FlView* self,
-                               guint keyval,
-                               guint keycode,
-                               GdkModifierType state) {
-  fl_keyboard_manager_handle_event(
-      self->keyboard_manager,
-      fl_key_event_new(
-          gtk_event_controller_get_current_event_time(self->key_controller),
-          TRUE, keycode, keyval, state,
-          gtk_event_controller_key_get_group(
-              GTK_EVENT_CONTROLLER_KEY(self->key_controller))));
+static gboolean key_event_cb(FlView* self, GdkEvent* event) {
+  GdkEventType type = gdk_event_get_event_type(event);
+  if (type == GDK_KEY_PRESS || type == GDK_KEY_RELEASE) {
+    return fl_keyboard_manager_handle_event(
+        self->keyboard_manager, fl_key_event_new_from_gdk_event(event));
+  }
 
   return FALSE;
-}
-
-static void key_released_cb(FlView* self,
-                            guint keyval,
-                            guint keycode,
-                            GdkModifierType state) {
-  fl_keyboard_manager_handle_event(
-      self->keyboard_manager,
-      fl_key_event_new(
-          gtk_event_controller_get_current_event_time(self->key_controller),
-          FALSE, keycode, keyval, state,
-          gtk_event_controller_key_get_group(
-              GTK_EVENT_CONTROLLER_KEY(self->key_controller))));
 }
 
 static const char* vertex_shader_src =
@@ -443,11 +425,9 @@ static void fl_view_constructed(GObject* object) {
                            G_CALLBACK(focus_changed_cb), self);
   gtk_widget_add_controller(GTK_WIDGET(self), self->focus_controller);
 
-  self->key_controller = gtk_event_controller_key_new();
-  g_signal_connect_swapped(self->key_controller, "key-pressed",
-                           G_CALLBACK(key_pressed_cb), self);
-  g_signal_connect_swapped(self->key_controller, "key-released",
-                           G_CALLBACK(key_released_cb), self);
+  self->key_controller = gtk_event_controller_legacy_new();
+  g_signal_connect_swapped(self->key_controller, "event",
+                           G_CALLBACK(key_event_cb), self);
   gtk_widget_add_controller(GTK_WIDGET(self), self->key_controller);
 }
 

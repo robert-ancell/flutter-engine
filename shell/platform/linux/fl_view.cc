@@ -122,7 +122,7 @@ static void init_keyboard(FlView* self) {
 
   g_clear_object(&self->text_input_plugin);
   self->text_input_plugin = fl_text_input_plugin_new(
-      messenger, im_context, FL_TEXT_INPUT_VIEW_DELEGATE(self));
+      messenger, self->im_context, FL_TEXT_INPUT_VIEW_DELEGATE(self));
   g_clear_object(&self->keyboard_manager);
   self->keyboard_manager =
       fl_keyboard_manager_new(messenger, FL_KEYBOARD_VIEW_DELEGATE(self));

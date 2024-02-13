@@ -30,6 +30,7 @@ final Set<String> skippedPaths = <String>{
   r'flutter/prebuilts',
   r'flutter/sky/packages/sky_engine/LICENSE',
   r'flutter/third_party/benchmark', // only used by tests
+  r'flutter/third_party/depot_tools', // only used for the Windows build system.
   r'flutter/third_party/expat/expat/doc',
   r'flutter/third_party/expat/expat/win32/expat.iss',
   r'flutter/third_party/flatbuffers/android',
@@ -204,9 +205,11 @@ final Set<String> skippedPaths = <String>{
   r'third_party/vulkan-deps/spirv-cross/src/shaders-ue4-no-opt', // used by regression tests
   r'third_party/vulkan-deps/spirv-headers', // only used on hosts for tests
   r'third_party/vulkan-deps/spirv-tools', // only used on hosts for tests
+  r'third_party/vulkan-deps/vulkan-headers/src/LICENSE.md', // redundant with licenses inside files
   r'third_party/vulkan-deps/vulkan-headers/src/registry',
   r'third_party/vulkan-deps/vulkan-loader', // on hosts for tests
   r'third_party/vulkan-deps/vulkan-tools', // on hosts for tests
+  r'third_party/vulkan-deps/vulkan-utility-libraries/src/LICENSE.md', // redundant with licenses inside files
   r'third_party/vulkan-deps/vulkan-validation-layers/src/docs',
   r'third_party/vulkan_memory_allocator/bin',
   r'third_party/vulkan_memory_allocator/docs',

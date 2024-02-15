@@ -4,9 +4,6 @@
 
 #include "fl_renderer.h"
 
-#include <epoxy/egl.h>
-#include <epoxy/gl.h>
-
 #include "flutter/shell/platform/embedder/embedder.h"
 #include "flutter/shell/platform/linux/fl_backing_store_provider.h"
 #include "flutter/shell/platform/linux/fl_engine_private.h"
@@ -26,9 +23,6 @@ typedef struct {
   // true if frame was completed; resizing is not synchronized until first frame
   // was rendered
   bool had_first_frame;
-
-  GdkGLContext* main_context;
-  GdkGLContext* resource_context;
 } FlRendererPrivate;
 
 G_DEFINE_TYPE_WITH_PRIVATE(FlRenderer, fl_renderer, G_TYPE_OBJECT)
@@ -63,19 +57,7 @@ gboolean fl_renderer_start(FlRenderer* self, FlView* view, GError** error) {
   g_return_val_if_fail(FL_IS_RENDERER(self), FALSE);
 
   priv->view = view;
-  gboolean result = FL_RENDERER_GET_CLASS(self)->create_contexts(
-      self, GTK_WIDGET(view), &priv->main_context, &priv->resource_context,
-      error);
-
-  if (result) {
-    gdk_gl_context_realize(priv->main_context, error);
-    gdk_gl_context_realize(priv->resource_context, error);
-  }
-
-  if (*error != nullptr) {
-    return FALSE;
-  }
-  return TRUE;
+  return FL_RENDERER_GET_CLASS(self)->start(self, error);
 }
 
 FlView* fl_renderer_get_view(FlRenderer* self) {
@@ -83,62 +65,6 @@ FlView* fl_renderer_get_view(FlRenderer* self) {
   FlRendererPrivate* priv = reinterpret_cast<FlRendererPrivate*>(
       fl_renderer_get_instance_private(self));
   return priv->view;
-}
-
-GdkGLContext* fl_renderer_get_context(FlRenderer* self) {
-  FlRendererPrivate* priv = reinterpret_cast<FlRendererPrivate*>(
-      fl_renderer_get_instance_private(self));
-
-  g_return_val_if_fail(FL_IS_RENDERER(self), NULL);
-
-  return priv->main_context;
-}
-
-void* fl_renderer_get_proc_address(FlRenderer* self, const char* name) {
-  g_return_val_if_fail(FL_IS_RENDERER(self), NULL);
-
-  return reinterpret_cast<void*>(eglGetProcAddress(name));
-}
-
-gboolean fl_renderer_make_current(FlRenderer* self, GError** error) {
-  FlRendererPrivate* priv = reinterpret_cast<FlRendererPrivate*>(
-      fl_renderer_get_instance_private(self));
-
-  g_return_val_if_fail(FL_IS_RENDERER(self), FALSE);
-
-  if (priv->main_context) {
-    gdk_gl_context_make_current(priv->main_context);
-  }
-
-  return TRUE;
-}
-
-gboolean fl_renderer_make_resource_current(FlRenderer* self, GError** error) {
-  FlRendererPrivate* priv = reinterpret_cast<FlRendererPrivate*>(
-      fl_renderer_get_instance_private(self));
-
-  g_return_val_if_fail(FL_IS_RENDERER(self), FALSE);
-
-  if (priv->resource_context) {
-    gdk_gl_context_make_current(priv->resource_context);
-  }
-
-  return TRUE;
-}
-
-gboolean fl_renderer_clear_current(FlRenderer* self, GError** error) {
-  g_return_val_if_fail(FL_IS_RENDERER(self), FALSE);
-
-  gdk_gl_context_clear_current();
-
-  return TRUE;
-}
-
-guint32 fl_renderer_get_fbo(FlRenderer* self) {
-  g_return_val_if_fail(FL_IS_RENDERER(self), 0);
-
-  // There is only one frame buffer object - always return that.
-  return 0;
 }
 
 gboolean fl_renderer_create_backing_store(

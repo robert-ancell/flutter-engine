@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <epoxy/egl.h>
+
 #include "flutter/shell/platform/linux/fl_renderer_gl.h"
 
 #include "flutter/shell/platform/linux/fl_backing_store_provider.h"
@@ -9,29 +11,34 @@
 
 struct _FlRendererGL {
   FlRenderer parent_instance;
+
+  GdkWindow* window;
+
+  GdkGLContext* main_context;
+  GdkGLContext* resource_context;
 };
 
 G_DEFINE_TYPE(FlRendererGL, fl_renderer_gl, fl_renderer_get_type())
 
-// Implements FlRenderer::create_contexts.
-static gboolean fl_renderer_gl_create_contexts(FlRenderer* renderer,
-                                               GtkWidget* widget,
-                                               GdkGLContext** visible,
-                                               GdkGLContext** resource,
-                                               GError** error) {
-  GdkWindow* window = gtk_widget_get_parent_window(widget);
+// Implements FlRenderer::start
+static gboolean fl_renderer_gl_start(FlRenderer* renderer, GError** error) {
+  FlRendererGL* self = FL_RENDERER_GL(renderer);
 
-  *visible = gdk_window_create_gl_context(window, error);
-
-  if (*error != nullptr) {
+  self->main_context = gdk_window_create_gl_context(self->window, error);
+  if (self->main_context == nullptr) {
     return FALSE;
   }
 
-  *resource = gdk_window_create_gl_context(window, error);
-
-  if (*error != nullptr) {
+  self->resource_context = gdk_window_create_gl_context(self->window, error);
+  if (self->resource_context == nullptr) {
     return FALSE;
   }
+
+  if (!gdk_gl_context_realize(self->main_context, error) ||
+      !gdk_gl_context_realize(self->resource_context, error)) {
+    return FALSE;
+  }
+
   return TRUE;
 }
 
@@ -40,8 +47,10 @@ static gboolean fl_renderer_gl_create_backing_store(
     FlRenderer* renderer,
     const FlutterBackingStoreConfig* config,
     FlutterBackingStore* backing_store_out) {
+  FlRendererGL* self = FL_RENDERER_GL(renderer);
+
   g_autoptr(GError) error = nullptr;
-  gboolean result = fl_renderer_make_current(renderer, &error);
+  gboolean result = fl_renderer_gl_make_current(self, &error);
   if (!result) {
     g_warning("Failed to make renderer current when creating backing store: %s",
               error->message);
@@ -75,8 +84,10 @@ static gboolean fl_renderer_gl_create_backing_store(
 static gboolean fl_renderer_gl_collect_backing_store(
     FlRenderer* renderer,
     const FlutterBackingStore* backing_store) {
+  FlRendererGL* self = FL_RENDERER_GL(renderer);
+
   g_autoptr(GError) error = nullptr;
-  gboolean result = fl_renderer_make_current(renderer, &error);
+  gboolean result = fl_renderer_gl_make_current(self, &error);
   if (!result) {
     g_warning(
         "Failed to make renderer current when collecting backing store: %s",
@@ -93,9 +104,10 @@ static gboolean fl_renderer_gl_collect_backing_store(
 static gboolean fl_renderer_gl_present_layers(FlRenderer* renderer,
                                               const FlutterLayer** layers,
                                               size_t layers_count) {
+  FlRendererGL* self = FL_RENDERER_GL(renderer);
+
   FlView* view = fl_renderer_get_view(renderer);
-  GdkGLContext* context = fl_renderer_get_context(renderer);
-  if (!view || !context) {
+  if (!view || !self->main_context) {
     return FALSE;
   }
 
@@ -115,13 +127,24 @@ static gboolean fl_renderer_gl_present_layers(FlRenderer* renderer,
     }
   }
 
-  fl_view_set_textures(view, context, textures);
+  fl_view_set_textures(view, self->main_context, textures);
 
   return TRUE;
 }
 
+static void fl_renderer_gl_dispose(GObject* object) {
+  FlRendererGL* self = FL_RENDERER_GL(object);
+
+  g_clear_object(&self->main_context);
+  g_clear_object(&self->resource_context);
+
+  G_OBJECT_CLASS(fl_renderer_gl_parent_class)->dispose(object);
+}
+
 static void fl_renderer_gl_class_init(FlRendererGLClass* klass) {
-  FL_RENDERER_CLASS(klass)->create_contexts = fl_renderer_gl_create_contexts;
+  G_OBJECT_CLASS(klass)->dispose = fl_renderer_gl_dispose;
+
+  FL_RENDERER_CLASS(klass)->start = fl_renderer_gl_start;
   FL_RENDERER_CLASS(klass)->create_backing_store =
       fl_renderer_gl_create_backing_store;
   FL_RENDERER_CLASS(klass)->collect_backing_store =
@@ -131,6 +154,48 @@ static void fl_renderer_gl_class_init(FlRendererGLClass* klass) {
 
 static void fl_renderer_gl_init(FlRendererGL* self) {}
 
-FlRendererGL* fl_renderer_gl_new() {
-  return FL_RENDERER_GL(g_object_new(fl_renderer_gl_get_type(), nullptr));
+FlRendererGL* fl_renderer_gl_new(GdkWindow* window) {
+  FlRendererGL* self =
+      FL_RENDERER_GL(g_object_new(fl_renderer_gl_get_type(), nullptr));
+  self->window = window;
+  return self;
+}
+
+void* fl_renderer_gl_get_proc_address(FlRendererGL* self, const char* name) {
+  g_return_val_if_fail(FL_IS_RENDERER_GL(self), NULL);
+  return reinterpret_cast<void*>(eglGetProcAddress(name));
+}
+
+guint32 fl_renderer_gl_get_fbo(FlRendererGL* self) {
+  g_return_val_if_fail(FL_IS_RENDERER_GL(self), 0);
+  // There is only one frame buffer object - always return that.
+  return 0;
+}
+
+gboolean fl_renderer_gl_make_current(FlRendererGL* self, GError** error) {
+  g_return_val_if_fail(FL_IS_RENDERER_GL(self), FALSE);
+
+  if (self->main_context) {
+    gdk_gl_context_make_current(self->main_context);
+  }
+
+  return TRUE;
+}
+
+gboolean fl_renderer_gl_make_resource_current(FlRendererGL* self,
+                                              GError** error) {
+  g_return_val_if_fail(FL_IS_RENDERER_GL(self), FALSE);
+
+  if (self->resource_context) {
+    gdk_gl_context_make_current(self->resource_context);
+  }
+
+  return TRUE;
+}
+
+gboolean fl_renderer_gl_clear_current(FlRendererGL* self, GError** error) {
+  g_return_val_if_fail(FL_IS_RENDERER_GL(self), FALSE);
+
+  gdk_gl_context_clear_current();
+  return TRUE;
 }

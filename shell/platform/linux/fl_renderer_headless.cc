@@ -10,15 +10,6 @@ struct _FlRendererHeadless {
 
 G_DEFINE_TYPE(FlRendererHeadless, fl_renderer_headless, fl_renderer_get_type())
 
-// Implements FlRenderer::create_contexts.
-static gboolean fl_renderer_headless_create_contexts(FlRenderer* renderer,
-                                                     GtkWidget* widget,
-                                                     GdkGLContext** visible,
-                                                     GdkGLContext** resource,
-                                                     GError** error) {
-  return FALSE;
-}
-
 // Implements FlRenderer::create_backing_store.
 static gboolean fl_renderer_headless_create_backing_store(
     FlRenderer* renderer,
@@ -42,8 +33,6 @@ static gboolean fl_renderer_headless_present_layers(FlRenderer* self,
 }
 
 static void fl_renderer_headless_class_init(FlRendererHeadlessClass* klass) {
-  FL_RENDERER_CLASS(klass)->create_contexts =
-      fl_renderer_headless_create_contexts;
   FL_RENDERER_CLASS(klass)->create_backing_store =
       fl_renderer_headless_create_backing_store;
   FL_RENDERER_CLASS(klass)->collect_backing_store =

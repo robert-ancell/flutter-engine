@@ -5,8 +5,6 @@
 #ifndef FLUTTER_SHELL_PLATFORM_LINUX_FL_RENDERER_H_
 #define FLUTTER_SHELL_PLATFORM_LINUX_FL_RENDERER_H_
 
-#include <gtk/gtk.h>
-
 #include "flutter/shell/platform/linux/public/flutter_linux/fl_dart_project.h"
 #include "flutter/shell/platform/linux/public/flutter_linux/fl_view.h"
 
@@ -39,30 +37,14 @@ struct _FlRendererClass {
   GObjectClass parent_class;
 
   /**
-   * Virtual method called when Flutter needs #GdkGLContext to render.
+   * Virtual method called when Flutter starts the renderer.
    * @renderer: an #FlRenderer.
-   * @widget: the widget being rendered on.
-   * @visible: (out): the GL context for visible surface.
-   * @resource: (out): the GL context for resource loading.
    * @error: (allow-none): #GError location to store the error occurring, or
-   * %NULL to ignore.
+   * %NULL
    *
-   * Returns: %TRUE if both contexts were created, %FALSE if there was an error.
+   * Returns: %TRUE if renderer successfully started.
    */
-  gboolean (*create_contexts)(FlRenderer* renderer,
-                              GtkWidget* widget,
-                              GdkGLContext** visible,
-                              GdkGLContext** resource,
-                              GError** error);
-
-  /**
-   * Virtual method called when Flutter needs OpenGL proc address.
-   * @renderer: an #FlRenderer.
-   * @name: proc name.
-   *
-   * Returns: OpenGL proc address.
-   */
-  void* (*get_proc_address)();
+  gboolean (*start)(FlRenderer* renderer, GError** error);
 
   /**
    * Virtual method called when Flutter needs a backing store for a specific
@@ -121,72 +103,6 @@ gboolean fl_renderer_start(FlRenderer* renderer, FlView* view, GError** error);
  * Returns: targeted #FlView or %NULL if headless.
  */
 FlView* fl_renderer_get_view(FlRenderer* renderer);
-
-/**
- * fl_renderer_get_context:
- * @renderer: an #FlRenderer.
- *
- * Returns: GL context for GLAreas or %NULL if headless.
- */
-GdkGLContext* fl_renderer_get_context(FlRenderer* renderer);
-
-/**
- * fl_renderer_get_proc_address:
- * @renderer: an #FlRenderer.
- * @name: a function name.
- *
- * Gets the rendering API function that matches the given name.
- *
- * Returns: a function pointer.
- */
-void* fl_renderer_get_proc_address(FlRenderer* renderer, const char* name);
-
-/**
- * fl_renderer_make_current:
- * @renderer: an #FlRenderer.
- * @error: (allow-none): #GError location to store the error occurring, or %NULL
- * to ignore.
- *
- * Makes the rendering context current.
- *
- * Returns %TRUE if successful.
- */
-gboolean fl_renderer_make_current(FlRenderer* renderer, GError** error);
-
-/**
- * fl_renderer_make_resource_current:
- * @renderer: an #FlRenderer.
- * @error: (allow-none): #GError location to store the error occurring, or %NULL
- * to ignore.
- *
- * Makes the resource rendering context current.
- *
- * Returns %TRUE if successful.
- */
-gboolean fl_renderer_make_resource_current(FlRenderer* renderer,
-                                           GError** error);
-
-/**
- * fl_renderer_clear_current:
- * @renderer: an #FlRenderer.
- * @error: (allow-none): #GError location to store the error occurring, or %NULL
- * to ignore.
- *
- * Clears the current rendering context.
- *
- * Returns %TRUE if successful.
- */
-gboolean fl_renderer_clear_current(FlRenderer* renderer, GError** error);
-
-/**
- * fl_renderer_get_fbo:
- * @renderer: an #FlRenderer.
- *
- * Gets the frame buffer object to render to.
- *
- * Returns: a frame buffer object index.
- */
-guint32 fl_renderer_get_fbo(FlRenderer* renderer);
 
 /**
  * fl_renderer_create_backing_store:

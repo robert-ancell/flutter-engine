@@ -34,7 +34,7 @@ struct _FlView {
   FlDartProject* project;
 
   // Rendering output.
-  FlRenderer* renderer;
+  FlRendererGL* renderer;
 
   // Engine running @project.
   FlEngine* engine;
@@ -220,7 +220,8 @@ static void handle_geometry_changed(FlView* self) {
   // Note: `gtk_widget_init()` initializes the size allocation to 1x1.
   if (allocation.width > 1 && allocation.height > 1 &&
       gtk_widget_get_realized(GTK_WIDGET(self))) {
-    fl_renderer_wait_for_frame(self->renderer, allocation.width * scale_factor,
+    fl_renderer_wait_for_frame(FL_RENDERER(self->renderer),
+                               allocation.width * scale_factor,
                                allocation.height * scale_factor);
   }
 }
@@ -519,8 +520,24 @@ static gboolean window_state_event_cb(FlView* self, GdkEvent* event) {
   return FALSE;
 }
 
-static void realize_cb(FlView* self) {
-  g_autoptr(GError) error = nullptr;
+static void size_allocate_cb(FlView* self) {
+  handle_geometry_changed(self);
+}
+
+static void realize_cb(FlView *self) {
+  self->renderer = fl_renderer_gl_new(gtk_widget_get_parent_window(GTK_WIDGET(self)));
+  self->engine = fl_engine_new(self->project, FL_RENDERER(self->renderer));
+  fl_engine_set_update_semantics_node_handler(
+      self->engine, update_semantics_node_cb, self, nullptr);
+  fl_engine_set_on_pre_engine_restart_handler(
+      self->engine, on_pre_engine_restart_cb, self, nullptr);
+
+  // Create system channel handlers.
+  FlBinaryMessenger* messenger = fl_engine_get_binary_messenger(self->engine);
+  self->accessibility_plugin = fl_accessibility_plugin_new(self);
+  init_scrolling(self);
+  self->mouse_cursor_plugin = fl_mouse_cursor_plugin_new(messenger, self);
+  self->platform_plugin = fl_platform_plugin_new(messenger);
 
   // Handle requests by the user to close the application.
   GtkWidget* toplevel_window = gtk_widget_get_toplevel(GTK_WIDGET(self));
@@ -537,7 +554,8 @@ static void realize_cb(FlView* self) {
 
   init_keyboard(self);
 
-  if (!fl_renderer_start(self->renderer, self, &error)) {
+  g_autoptr(GError) error = nullptr;
+  if (!fl_renderer_start(FL_RENDERER(self->renderer), self, &error)) {
     g_warning("Failed to start Flutter renderer: %s", error->message);
     return;
   }
@@ -547,32 +565,16 @@ static void realize_cb(FlView* self) {
     return;
   }
 
-  handle_geometry_changed(self);
-}
-
-static void size_allocate_cb(FlView* self) {
+  g_signal_connect_swapped(self, "size-allocate", G_CALLBACK(size_allocate_cb),
+                           self);
   handle_geometry_changed(self);
 }
 
 static void fl_view_constructed(GObject* object) {
   FlView* self = FL_VIEW(object);
 
-  self->renderer = FL_RENDERER(fl_renderer_gl_new());
-  self->engine = fl_engine_new(self->project, self->renderer);
-  fl_engine_set_update_semantics_node_handler(
-      self->engine, update_semantics_node_cb, self, nullptr);
-  fl_engine_set_on_pre_engine_restart_handler(
-      self->engine, on_pre_engine_restart_cb, self, nullptr);
-
   // Must initialize the keymap before the keyboard.
   self->keymap = gdk_keymap_get_for_display(gdk_display_get_default());
-
-  // Create system channel handlers.
-  FlBinaryMessenger* messenger = fl_engine_get_binary_messenger(self->engine);
-  self->accessibility_plugin = fl_accessibility_plugin_new(self);
-  init_scrolling(self);
-  self->mouse_cursor_plugin = fl_mouse_cursor_plugin_new(messenger, self);
-  self->platform_plugin = fl_platform_plugin_new(messenger);
 
   self->event_box = gtk_event_box_new();
   gtk_widget_set_hexpand(self->event_box, TRUE);
@@ -613,8 +615,6 @@ static void fl_view_constructed(GObject* object) {
                            self);
 
   g_signal_connect_swapped(self, "realize", G_CALLBACK(realize_cb), self);
-  g_signal_connect_swapped(self, "size-allocate", G_CALLBACK(size_allocate_cb),
-                           self);
 }
 
 static void fl_view_set_property(GObject* object,

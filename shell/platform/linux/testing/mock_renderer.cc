@@ -10,15 +10,6 @@ struct _FlMockRenderer {
 
 G_DEFINE_TYPE(FlMockRenderer, fl_mock_renderer, fl_renderer_get_type())
 
-// Implements FlRenderer::create_contexts.
-static gboolean fl_mock_renderer_create_contexts(FlRenderer* renderer,
-                                                 GtkWidget* widget,
-                                                 GdkGLContext** visible,
-                                                 GdkGLContext** resource,
-                                                 GError** error) {
-  return TRUE;
-}
-
 // Implements FlRenderer::create_backing_store.
 static gboolean fl_mock_renderer_create_backing_store(
     FlRenderer* renderer,
@@ -42,7 +33,6 @@ static gboolean fl_mock_renderer_present_layers(FlRenderer* self,
 }
 
 static void fl_mock_renderer_class_init(FlMockRendererClass* klass) {
-  FL_RENDERER_CLASS(klass)->create_contexts = fl_mock_renderer_create_contexts;
   FL_RENDERER_CLASS(klass)->create_backing_store =
       fl_mock_renderer_create_backing_store;
   FL_RENDERER_CLASS(klass)->collect_backing_store =

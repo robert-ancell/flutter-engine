@@ -20,6 +20,7 @@
 #include "flutter/shell/platform/linux/fl_pixel_buffer_texture_private.h"
 #include "flutter/shell/platform/linux/fl_plugin_registrar_private.h"
 #include "flutter/shell/platform/linux/fl_renderer.h"
+#include "flutter/shell/platform/linux/fl_renderer_gl.h"
 #include "flutter/shell/platform/linux/fl_renderer_headless.h"
 #include "flutter/shell/platform/linux/fl_settings_plugin.h"
 #include "flutter/shell/platform/linux/fl_texture_gl_private.h"
@@ -212,13 +213,14 @@ static bool compositor_present_layers_callback(const FlutterLayer** layers,
 
 static void* fl_engine_gl_proc_resolver(void* user_data, const char* name) {
   FlEngine* self = static_cast<FlEngine*>(user_data);
-  return fl_renderer_get_proc_address(self->renderer, name);
+  return fl_renderer_gl_get_proc_address(FL_RENDERER_GL(self->renderer), name);
 }
 
 static bool fl_engine_gl_make_current(void* user_data) {
   FlEngine* self = static_cast<FlEngine*>(user_data);
   g_autoptr(GError) error = nullptr;
-  gboolean result = fl_renderer_make_current(self->renderer, &error);
+  gboolean result =
+      fl_renderer_gl_make_current(FL_RENDERER_GL(self->renderer), &error);
   if (!result) {
     g_warning("%s", error->message);
   }
@@ -228,7 +230,8 @@ static bool fl_engine_gl_make_current(void* user_data) {
 static bool fl_engine_gl_clear_current(void* user_data) {
   FlEngine* self = static_cast<FlEngine*>(user_data);
   g_autoptr(GError) error = nullptr;
-  gboolean result = fl_renderer_clear_current(self->renderer, &error);
+  gboolean result =
+      fl_renderer_gl_clear_current(FL_RENDERER_GL(self->renderer), &error);
   if (!result) {
     g_warning("%s", error->message);
   }
@@ -237,7 +240,7 @@ static bool fl_engine_gl_clear_current(void* user_data) {
 
 static uint32_t fl_engine_gl_get_fbo(void* user_data) {
   FlEngine* self = static_cast<FlEngine*>(user_data);
-  return fl_renderer_get_fbo(self->renderer);
+  return fl_renderer_gl_get_fbo(FL_RENDERER_GL(self->renderer));
 }
 
 static bool fl_engine_gl_present(void* user_data) {
@@ -249,7 +252,8 @@ static bool fl_engine_gl_present(void* user_data) {
 static bool fl_engine_gl_make_resource_current(void* user_data) {
   FlEngine* self = static_cast<FlEngine*>(user_data);
   g_autoptr(GError) error = nullptr;
-  gboolean result = fl_renderer_make_resource_current(self->renderer, &error);
+  gboolean result = fl_renderer_gl_make_resource_current(
+      FL_RENDERER_GL(self->renderer), &error);
   if (!result) {
     g_warning("%s", error->message);
   }
@@ -485,6 +489,7 @@ gboolean fl_engine_start(FlEngine* self, GError** error) {
 
   self->task_runner = fl_task_runner_new(self);
 
+  // FIXME: Only if renderer is FlRendererGL
   FlutterRendererConfig config = {};
   config.type = kOpenGL;
   config.open_gl.struct_size = sizeof(FlutterOpenGLRendererConfig);

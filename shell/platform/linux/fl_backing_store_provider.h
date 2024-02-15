@@ -29,8 +29,7 @@ G_DECLARE_FINAL_TYPE(FlBackingStoreProvider,
  * @width: width of texture.
  * @height: height of texture.
  *
- * Creates a new frame buffer. fl_renderer_make_current() must be called
- * first.
+ * Creates a new frame buffer.
  *
  * Returns: a new #FlBackingStoreProvider.
  */

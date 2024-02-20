@@ -96,9 +96,6 @@ source_set("flutter_linux_sources") {
   configs += [ "//flutter/shell/platform/linux/config:gtk" ]
 
   sources = [
-    "fl_accessibility_plugin.cc",
-    "fl_accessible_node.cc",
-    "fl_accessible_text_field.cc",
     "fl_backing_store_provider.cc",
     "fl_basic_message_channel.cc",
     "fl_binary_codec.cc",
@@ -145,7 +142,6 @@ source_set("flutter_linux_sources") {
     "fl_texture_registrar.cc",
     "fl_value.cc",
     "fl_view.cc",
-    "fl_view_accessible.cc",
     "key_mapping.g.cc",
   ]
 
@@ -193,8 +189,6 @@ executable("flutter_linux_unittests") {
   testonly = true
 
   sources = [
-    "fl_accessible_node_test.cc",
-    "fl_accessible_text_field_test.cc",
     "fl_basic_message_channel_test.cc",
     "fl_binary_codec_test.cc",
     "fl_binary_messenger_test.cc",
@@ -205,8 +199,6 @@ executable("flutter_linux_unittests") {
     "fl_json_message_codec_test.cc",
     "fl_json_method_codec_test.cc",
     "fl_key_channel_responder_test.cc",
-    "fl_key_embedder_responder_test.cc",
-    "fl_keyboard_manager_test.cc",
     "fl_message_codec_test.cc",
     "fl_method_channel_test.cc",
     "fl_method_codec_test.cc",
@@ -214,17 +206,14 @@ executable("flutter_linux_unittests") {
     "fl_pixel_buffer_texture_test.cc",
     "fl_platform_plugin_test.cc",
     "fl_plugin_registrar_test.cc",
-    "fl_scrolling_manager_test.cc",
     "fl_settings_plugin_test.cc",
     "fl_settings_portal_test.cc",
     "fl_standard_message_codec_test.cc",
     "fl_standard_method_codec_test.cc",
     "fl_string_codec_test.cc",
-    "fl_text_input_plugin_test.cc",
     "fl_texture_gl_test.cc",
     "fl_texture_registrar_test.cc",
     "fl_value_test.cc",
-    "fl_view_accessible_test.cc",
     "fl_view_test.cc",
     "key_mapping_test.cc",
     "testing/fl_test.cc",
@@ -234,7 +223,6 @@ executable("flutter_linux_unittests") {
     "testing/mock_binary_messenger_response_handle.cc",
     "testing/mock_engine.cc",
     "testing/mock_epoxy.cc",
-    "testing/mock_im_context.cc",
     "testing/mock_plugin_registrar.cc",
     "testing/mock_renderer.cc",
     "testing/mock_settings.cc",

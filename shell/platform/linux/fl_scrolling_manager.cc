@@ -4,7 +4,7 @@
 
 #include "flutter/shell/platform/linux/fl_scrolling_manager.h"
 
-static constexpr int kMicrosecondsPerMillisecond = 1000;
+// static constexpr int kMicrosecondsPerMillisecond = 1000;
 
 struct _FlScrollingManager {
   GObject parent_instance;
@@ -64,6 +64,7 @@ void fl_scrolling_manager_set_last_mouse_position(FlScrollingManager* self,
   self->last_y = y;
 }
 
+#if 0
 void fl_scrolling_manager_handle_scroll_event(FlScrollingManager* self,
                                               GdkEventScroll* scroll_event,
                                               gint scale_factor) {
@@ -137,6 +138,7 @@ void fl_scrolling_manager_handle_scroll_event(FlScrollingManager* self,
         event_y * scale_factor, scroll_delta_x, scroll_delta_y, 0);
   }
 }
+#endif
 
 void fl_scrolling_manager_handle_rotation_begin(FlScrollingManager* self) {
   self->rotate_started = true;

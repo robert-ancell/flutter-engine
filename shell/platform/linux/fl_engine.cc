@@ -50,6 +50,8 @@ struct _FlEngine {
   FLUTTER_API_SYMBOL(FlutterEngine) engine;
   FlutterEngineProcTable embedder_api;
 
+  gboolean have_opengl;
+
   // Next ID to use for a view.
   FlutterViewId next_view_id;
 
@@ -190,9 +192,10 @@ static bool compositor_create_backing_store_callback(
     const FlutterBackingStoreConfig* config,
     FlutterBackingStore* backing_store_out,
     void* user_data) {
-  g_return_val_if_fail(FL_IS_RENDERER(user_data), false);
-  return fl_renderer_create_backing_store(FL_RENDERER(user_data), config,
-                                          backing_store_out);
+  FlEngine* self = static_cast<FlEngine*>(user_data);
+  return fl_renderer_create_backing_store(
+      self->renderer, self->have_opengl ? kOpenGL : kSoftware, config,
+      backing_store_out);
 }
 
 // Called when the backing store is to be released.
@@ -286,6 +289,13 @@ static bool fl_engine_gl_external_texture_frame_callback(
     return false;
   }
 
+  return true;
+}
+
+static bool fl_engine_software_present(void* user_data,
+                                       const void* allocation,
+                                       size_t row_bytes,
+                                       size_t height) {
   return true;
 }
 
@@ -498,16 +508,22 @@ gboolean fl_engine_start(FlEngine* self, GError** error) {
   self->task_runner = fl_task_runner_new(self);
 
   FlutterRendererConfig config = {};
-  config.type = kOpenGL;
-  config.open_gl.struct_size = sizeof(FlutterOpenGLRendererConfig);
-  config.open_gl.gl_proc_resolver = fl_engine_gl_proc_resolver;
-  config.open_gl.make_current = fl_engine_gl_make_current;
-  config.open_gl.clear_current = fl_engine_gl_clear_current;
-  config.open_gl.fbo_callback = fl_engine_gl_get_fbo;
-  config.open_gl.present = fl_engine_gl_present;
-  config.open_gl.make_resource_current = fl_engine_gl_make_resource_current;
-  config.open_gl.gl_external_texture_frame_callback =
-      fl_engine_gl_external_texture_frame_callback;
+  if (self->have_opengl) {
+    config.type = kOpenGL;
+    config.open_gl.struct_size = sizeof(FlutterOpenGLRendererConfig);
+    config.open_gl.gl_proc_resolver = fl_engine_gl_proc_resolver;
+    config.open_gl.make_current = fl_engine_gl_make_current;
+    config.open_gl.clear_current = fl_engine_gl_clear_current;
+    config.open_gl.fbo_callback = fl_engine_gl_get_fbo;
+    config.open_gl.present = fl_engine_gl_present;
+    config.open_gl.make_resource_current = fl_engine_gl_make_resource_current;
+    config.open_gl.gl_external_texture_frame_callback =
+        fl_engine_gl_external_texture_frame_callback;
+  } else {
+    config.type = kSoftware;
+    config.software.struct_size = sizeof(FlutterSoftwareRendererConfig);
+    config.software.surface_present_callback = fl_engine_software_present;
+  }
 
   FlutterTaskRunnerDescription platform_task_runner = {};
   platform_task_runner.struct_size = sizeof(FlutterTaskRunnerDescription);

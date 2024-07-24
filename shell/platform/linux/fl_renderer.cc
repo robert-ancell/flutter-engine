@@ -320,11 +320,11 @@ guint32 fl_renderer_get_fbo(FlRenderer* self) {
   return 0;
 }
 
-gboolean fl_renderer_create_backing_store(
-    FlRenderer* renderer,
+static gboolean create_framebuffer_backing_store(
+    FlRenderer* self,
     const FlutterBackingStoreConfig* config,
     FlutterBackingStore* backing_store_out) {
-  fl_renderer_make_current(renderer);
+  fl_renderer_make_current(self);
 
   FlFramebuffer* framebuffer =
       fl_framebuffer_new(config->size.width, config->size.height);
@@ -341,11 +341,44 @@ gboolean fl_renderer_create_backing_store(
   backing_store_out->open_gl.framebuffer.target =
       fl_framebuffer_get_format(framebuffer);
   backing_store_out->open_gl.framebuffer.destruction_callback = [](void* p) {
-    // Backing store destroyed in fl_renderer_collect_backing_store(), set
-    // on FlutterCompositor.collect_backing_store_callback during engine start.
+    // Backing store destroyed in fl_renderer_collect_backing_store(),
+    // set on FlutterCompositor.collect_backing_store_callback during
+    // engine start.
   };
-
   return TRUE;
+}
+
+static gboolean create_software_backing_store(
+    FlRenderer* self,
+    const FlutterBackingStoreConfig* config,
+    FlutterBackingStore* backing_store_out) {
+  backing_store_out->type = kFlutterBackingStoreTypeSoftware2;
+  backing_store_out->software2.struct_size =
+      sizeof(FlutterSoftwareBackingStore2);
+  backing_store_out->software2.allocation =
+      malloc(4 * config->size.width * config->size.height);
+  backing_store_out->software2.row_bytes = 4 * config->size.width;
+  backing_store_out->software2.height = config->size.height;
+  backing_store_out->software2.user_data = nullptr;
+  backing_store_out->software2.destruction_callback = nullptr;  // FIXME
+  backing_store_out->software2.pixel_format =
+      kFlutterSoftwarePixelFormatRGBA8888;
+  return TRUE;
+}
+
+gboolean fl_renderer_create_backing_store(
+    FlRenderer* self,
+    FlutterRendererType type,
+    const FlutterBackingStoreConfig* config,
+    FlutterBackingStore* backing_store_out) {
+  switch (type) {
+    case kOpenGL:
+      return create_framebuffer_backing_store(self, config, backing_store_out);
+    case kSoftware:
+      return create_software_backing_store(self, config, backing_store_out);
+    default:
+      return FALSE;
+  }
 }
 
 gboolean fl_renderer_collect_backing_store(
@@ -406,9 +439,11 @@ gboolean fl_renderer_present_layers(FlRenderer* self,
     switch (layer->type) {
       case kFlutterLayerContentTypeBackingStore: {
         const FlutterBackingStore* backing_store = layer->backing_store;
-        FlFramebuffer* framebuffer =
-            FL_FRAMEBUFFER(backing_store->open_gl.framebuffer.user_data);
-        g_ptr_array_add(priv->framebuffers, g_object_ref(framebuffer));
+        if (backing_store->type == kFlutterBackingStoreTypeOpenGL) {
+          FlFramebuffer* framebuffer =
+              FL_FRAMEBUFFER(backing_store->open_gl.framebuffer.user_data);
+          g_ptr_array_add(priv->framebuffers, g_object_ref(framebuffer));
+        }
       } break;
       case kFlutterLayerContentTypePlatformView: {
         // TODO(robert-ancell) Not implemented -

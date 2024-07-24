@@ -138,6 +138,7 @@ guint32 fl_renderer_get_fbo(FlRenderer* renderer);
 /**
  * fl_renderer_create_backing_store:
  * @renderer: an #FlRenderer.
+ * @type: type of backing store.
  * @config: backing store config.
  * @backing_store_out: saves created backing store.
  *
@@ -147,6 +148,7 @@ guint32 fl_renderer_get_fbo(FlRenderer* renderer);
  */
 gboolean fl_renderer_create_backing_store(
     FlRenderer* renderer,
+    FlutterRendererType type,
     const FlutterBackingStoreConfig* config,
     FlutterBackingStore* backing_store_out);
 

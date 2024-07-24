@@ -103,6 +103,32 @@ G_DEFINE_TYPE_WITH_CODE(
                 G_IMPLEMENT_INTERFACE(fl_text_input_view_delegate_get_type(),
                                       fl_view_text_input_delegate_iface_init))
 
+// Handler for response from engine to registering a view.
+static void view_added_cb(GObject* object,
+                          GAsyncResult* result,
+                          gpointer user_data) {
+  FlView* self = FL_VIEW(user_data);
+
+  g_autoptr(GError) error = nullptr;
+  FlutterViewId view_id =
+      fl_engine_add_view_finish(FL_ENGINE(object), result, &error);
+  if (view_id == 0) {
+    if (g_error_matches(error, G_IO_ERROR, G_IO_ERROR_CANCELLED)) {
+      return;
+    }
+    g_warning("Failed to add view to engine: %s", error->message);
+    return;
+  }
+
+  g_printerr("Assigned view ID %li", view_id);
+  self->view_id = view_id;
+  // FIXME: Do in FlEngine, e.g. by returning the view?
+  // FIXME: Perhaps use an interview so don't need FlView?
+  fl_renderer_add_view(FL_RENDERER(self->renderer), self->view_id, self);
+
+  // FIXME: Emit signal
+}
+
 // Signal handler for GtkWidget::delete-event
 static gboolean window_delete_event_cb(FlView* self) {
   fl_platform_handler_request_app_exit(self->platform_handler);
@@ -583,8 +609,6 @@ static void realize_cb(FlView* self) {
 
   init_keyboard(self);
 
-  fl_renderer_add_view(FL_RENDERER(self->renderer), self->view_id, self);
-
   if (!fl_engine_start(self->engine, &error)) {
     g_warning("Failed to start Flutter engine: %s", error->message);
     return;
@@ -772,6 +796,8 @@ G_MODULE_EXPORT FlView* fl_view_new_for_engine(FlEngine* engine) {
   g_assert(FL_IS_RENDERER_GDK(renderer));
   self->renderer = FL_RENDERER_GDK(g_object_ref(renderer));
 
+  self->view_id = 0;  // Implicit view
+  fl_renderer_add_view(FL_RENDERER(self->renderer), self->view_id, self);
   fl_engine_set_update_semantics_handler(self->engine, update_semantics_cb,
                                          self, nullptr);
   fl_engine_set_on_pre_engine_restart_handler(

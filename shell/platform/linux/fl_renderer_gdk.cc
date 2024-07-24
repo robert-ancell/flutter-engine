@@ -111,7 +111,18 @@ gboolean fl_renderer_gdk_create_contexts(FlRendererGdk* self, GError** error) {
     return FALSE;
   }
 
-  self->resource_context = gdk_window_create_gl_context(self->window, error);
+  GdkDisplay* display = gdk_display_get_default();
+  GdkScreen* screen = gdk_display_get_default_screen(display);
+  GdkWindowAttr attributes;
+  attributes.window_type = GDK_WINDOW_TOPLEVEL;
+  attributes.wclass = GDK_INPUT_OUTPUT;
+  attributes.event_mask = 0;
+  attributes.visual = gdk_screen_get_rgba_visual(screen);
+  GdkWindowAttributesType attributes_mask = GDK_WA_VISUAL;
+  GdkWindow* offscreen_window =
+      gdk_window_new(nullptr, &attributes, attributes_mask);
+  self->resource_context =
+      gdk_window_create_gl_context(offscreen_window, error);
   if (self->resource_context == nullptr) {
     return FALSE;
   }

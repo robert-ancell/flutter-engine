@@ -149,6 +149,7 @@ source_set("flutter_linux_sources") {
     "fl_value.cc",
     "fl_view.cc",
     "fl_view_accessible.cc",
+    "fl_view_handler.cc",
     "fl_window_state_monitor.cc",
     "key_mapping.g.cc",
   ]

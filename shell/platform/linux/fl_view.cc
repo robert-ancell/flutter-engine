@@ -208,8 +208,10 @@ static gboolean send_pointer_button_event(FlView* self, GdkEvent* event) {
   gint scale_factor = gtk_widget_get_scale_factor(GTK_WIDGET(self));
   fl_scrolling_manager_set_last_mouse_position(
       self->scrolling_manager, event_x * scale_factor, event_y * scale_factor);
-  fl_keyboard_handler_sync_modifier_if_needed(self->keyboard_handler,
-                                              event_state, event_time);
+  if (self->view_id == flutter::kFlutterImplicitViewId) {
+    fl_keyboard_handler_sync_modifier_if_needed(self->keyboard_handler,
+                                                event_state, event_time);
+  }
   fl_engine_send_mouse_pointer_event(
       self->engine, self->view_id, phase,
       event_time * kMicrosecondsPerMillisecond, event_x * scale_factor,
@@ -252,11 +254,13 @@ static void handle_geometry_changed(FlView* self) {
   // shown and the view is added to a container in the app runner.
   //
   // Note: `gtk_widget_init()` initializes the size allocation to 1x1.
-  if (allocation.width > 1 && allocation.height > 1 &&
-      gtk_widget_get_realized(GTK_WIDGET(self))) {
-    fl_renderer_wait_for_frame(FL_RENDERER(self->renderer),
-                               allocation.width * scale_factor,
-                               allocation.height * scale_factor);
+  if (self->view_id == flutter::kFlutterImplicitViewId) {
+    if (allocation.width > 1 && allocation.height > 1 &&
+        gtk_widget_get_realized(GTK_WIDGET(self))) {
+      fl_renderer_wait_for_frame(FL_RENDERER(self->renderer),
+                                 allocation.width * scale_factor,
+                                 allocation.height * scale_factor);
+    }
   }
 }
 
@@ -443,8 +447,10 @@ static gboolean motion_notify_event_cb(FlView* self,
 
   gint scale_factor = gtk_widget_get_scale_factor(GTK_WIDGET(self));
 
-  fl_keyboard_handler_sync_modifier_if_needed(self->keyboard_handler,
-                                              event_state, event_time);
+  if (self->view_id == flutter::kFlutterImplicitViewId) {
+    fl_keyboard_handler_sync_modifier_if_needed(self->keyboard_handler,
+                                                event_state, event_time);
+  }
   fl_engine_send_mouse_pointer_event(
       self->engine, self->view_id, self->button_state != 0 ? kMove : kHover,
       event_time * kMicrosecondsPerMillisecond, event_x * scale_factor,
@@ -537,6 +543,11 @@ static void gesture_zoom_end_cb(FlView* self) {
 }
 
 static GdkGLContext* create_context_cb(FlView* self) {
+  // Secondary windows use standard context.
+  if (self->view_id != flutter::kFlutterImplicitViewId) {
+    return nullptr;
+  }
+
   fl_renderer_gdk_set_window(self->renderer,
                              gtk_widget_get_parent_window(GTK_WIDGET(self)));
 
@@ -576,29 +587,35 @@ static void realize_cb(FlView* self) {
 
   GtkWidget* toplevel_window = gtk_widget_get_toplevel(GTK_WIDGET(self));
 
-  self->window_state_monitor =
-      fl_window_state_monitor_new(fl_engine_get_binary_messenger(self->engine),
-                                  GTK_WINDOW(toplevel_window));
+  if (self->view_id == flutter::kFlutterImplicitViewId) {
+    self->window_state_monitor = fl_window_state_monitor_new(
+        fl_engine_get_binary_messenger(self->engine),
+        GTK_WINDOW(toplevel_window));
 
-  // Handle requests by the user to close the application.
-  g_signal_connect_swapped(toplevel_window, "delete-event",
-                           G_CALLBACK(window_delete_event_cb), self);
+    // Handle requests by the user to close the application.
+    g_signal_connect_swapped(toplevel_window, "delete-event",
+                             G_CALLBACK(window_delete_event_cb), self);
 
-  init_keyboard(self);
+    init_keyboard(self);
+  }
 
   fl_renderer_add_view(FL_RENDERER(self->renderer), self->view_id, self);
 
-  if (!fl_engine_start(self->engine, &error)) {
-    g_warning("Failed to start Flutter engine: %s", error->message);
-    return;
+  if (self->view_id == flutter::kFlutterImplicitViewId) {
+    if (!fl_engine_start(self->engine, &error)) {
+      g_warning("Failed to start Flutter engine: %s", error->message);
+      return;
+    }
   }
 
   handle_geometry_changed(self);
 
-  self->view_accessible = fl_view_accessible_new(self->engine);
-  fl_socket_accessible_embed(
-      FL_SOCKET_ACCESSIBLE(gtk_widget_get_accessible(GTK_WIDGET(self))),
-      atk_plug_get_id(ATK_PLUG(self->view_accessible)));
+  if (self->view_id == flutter::kFlutterImplicitViewId) {
+    self->view_accessible = fl_view_accessible_new(self->engine);
+    fl_socket_accessible_embed(
+        FL_SOCKET_ACCESSIBLE(gtk_widget_get_accessible(GTK_WIDGET(self))),
+        atk_plug_get_id(ATK_PLUG(self->view_accessible)));
+  }
 }
 
 static gboolean render_cb(FlView* self, GdkGLContext* context) {
@@ -609,9 +626,65 @@ static gboolean render_cb(FlView* self, GdkGLContext* context) {
   int width = gtk_widget_get_allocated_width(GTK_WIDGET(self->gl_area));
   int height = gtk_widget_get_allocated_height(GTK_WIDGET(self->gl_area));
   gint scale_factor = gtk_widget_get_scale_factor(GTK_WIDGET(self->gl_area));
+
+  // Render into a texture on secondary views.
+  GLuint texture_id, framebuffer_id;
+  if (self->view_id != 0) {
+    fl_renderer_make_current(FL_RENDERER(self->renderer));
+
+    glGenTextures(1, &texture_id);
+    glGenFramebuffers(1, &framebuffer_id);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, framebuffer_id);
+    glBindTexture(GL_TEXTURE_2D, texture_id);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width * scale_factor,
+                 height * scale_factor, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    glFramebufferTexture2D(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT,
+                           GL_TEXTURE_2D, texture_id, 0);
+  }
+
   fl_renderer_render(FL_RENDERER(self->renderer), self->view_id,
                      width * scale_factor, height * scale_factor,
                      self->background_color);
+
+  if (self->view_id != 0) {
+    // Read back texture
+    int w = width * scale_factor;
+    int h = height * scale_factor;
+    size_t data_length = w * h * 4;
+    uint8_t* data = static_cast<uint8_t*>(malloc(data_length));
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, framebuffer_id);
+    glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, data);
+    glDeleteFramebuffers(1, &framebuffer_id);
+    glDeleteTextures(1, &texture_id);
+
+    // Render into secondary window
+    gtk_gl_area_make_current(self->gl_area);
+
+    // Store framebuffer to write to GTK.
+    GLint original_framebuffer;
+    glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &original_framebuffer);
+
+    // Copy pixels into a new texture.
+    GLuint texture, framebuffer;
+    glGenTextures(1, &texture);
+    glGenFramebuffers(1, &framebuffer);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, framebuffer);
+    glBindTexture(GL_TEXTURE_2D, texture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE,
+                 data);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
+                           texture, 0);
+
+    // Write the copied pixels to the widget.
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, framebuffer);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, original_framebuffer);
+    glBlitFramebuffer(0, 0, w, h, 0, 0, w, h, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+
+    glDeleteTextures(1, &texture);
+    glDeleteFramebuffers(1, &framebuffer);
+
+    free(data);
+  }
 
   return TRUE;
 }
@@ -627,7 +700,9 @@ static void unrealize_cb(FlView* self) {
     return;
   }
 
-  fl_renderer_cleanup(FL_RENDERER(self->renderer));
+  if (self->view_id == flutter::kFlutterImplicitViewId) {
+    fl_renderer_cleanup(FL_RENDERER(self->renderer));
+  }
 }
 
 static void size_allocate_cb(FlView* self) {
@@ -782,10 +857,12 @@ FlView* fl_view_new2(FlEngine* engine, FlutterViewId view_id) {
   g_assert(FL_IS_RENDERER_GDK(renderer));
   self->renderer = FL_RENDERER_GDK(g_object_ref(renderer));
 
-  fl_engine_set_update_semantics_handler(self->engine, update_semantics_cb,
-                                         self, nullptr);
-  fl_engine_set_on_pre_engine_restart_handler(
-      self->engine, on_pre_engine_restart_cb, self, nullptr);
+  if (self->view_id == flutter::kFlutterImplicitViewId) {
+    fl_engine_set_update_semantics_handler(self->engine, update_semantics_cb,
+                                           self, nullptr);
+    fl_engine_set_on_pre_engine_restart_handler(
+        self->engine, on_pre_engine_restart_cb, self, nullptr);
+  }
 
   return self;
 }

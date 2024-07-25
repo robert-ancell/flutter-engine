@@ -24,6 +24,7 @@
 #include "flutter/shell/platform/linux/fl_settings_handler.h"
 #include "flutter/shell/platform/linux/fl_texture_gl_private.h"
 #include "flutter/shell/platform/linux/fl_texture_registrar_private.h"
+#include "flutter/shell/platform/linux/fl_view_handler.h"
 #include "flutter/shell/platform/linux/public/flutter_linux/fl_plugin_registry.h"
 
 // Unique number associated with platform tasks.
@@ -45,6 +46,7 @@ struct _FlEngine {
   FlBinaryMessenger* binary_messenger;
   FlSettingsHandler* settings_handler;
   FlTextureRegistrar* texture_registrar;
+  FlViewHandler* view_handler;
   FlTaskRunner* task_runner;
   FlutterEngineAOTData aot_data;
   FLUTTER_API_SYMBOL(FlutterEngine) engine;
@@ -409,6 +411,7 @@ static void fl_engine_dispose(GObject* object) {
   g_clear_object(&self->project);
   g_clear_object(&self->renderer);
   g_clear_object(&self->texture_registrar);
+  g_clear_object(&self->view_handler);
   g_clear_object(&self->binary_messenger);
   g_clear_object(&self->settings_handler);
   g_clear_object(&self->task_runner);
@@ -458,8 +461,6 @@ static void fl_engine_init(FlEngine* self) {
 
   // Implicit view is 0, so start at 1.
   self->next_view_id = 1;
-
-  self->texture_registrar = fl_texture_registrar_new(self);
 }
 
 FlEngine* fl_engine_new_with_renderer(FlDartProject* project,
@@ -471,6 +472,8 @@ FlEngine* fl_engine_new_with_renderer(FlDartProject* project,
   self->project = FL_DART_PROJECT(g_object_ref(project));
   self->renderer = FL_RENDERER(g_object_ref(renderer));
   self->binary_messenger = fl_binary_messenger_new(self);
+  self->texture_registrar = fl_texture_registrar_new(self);
+  self->view_handler = fl_view_handler_new(self);
 
   fl_renderer_set_engine(self->renderer, self);
 

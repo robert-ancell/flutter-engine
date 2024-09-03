@@ -6,6 +6,7 @@
 
 #include "flutter/fml/logging.h"
 #include "flutter/shell/platform/linux/fl_framebuffer.h"
+#include "flutter/shell/platform/linux/fl_view_private.h"
 #include "flutter/shell/platform/linux/testing/fl_test_gtk_logs.h"
 #include "flutter/shell/platform/linux/testing/mock_epoxy.h"
 #include "flutter/shell/platform/linux/testing/mock_renderer.h"
@@ -50,7 +51,8 @@ TEST(FlRendererTest, RestoresGLState) {
 
   flutter::testing::fl_ensure_gtk_init();
   g_autoptr(FlDartProject) project = fl_dart_project_new();
-  g_autoptr(FlView) view = fl_view_new(project);
+  g_autoptr(FlEngine) engine = fl_engine_new(project);
+  g_autoptr(FlView) view = fl_view_new_implicit(engine);
   g_autoptr(FlMockRenderer) renderer = fl_mock_renderer_new();
   g_autoptr(FlFramebuffer) framebuffer = fl_framebuffer_new(kWidth, kHeight);
 

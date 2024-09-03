@@ -9,6 +9,7 @@
 #include <gdk/gdkx.h>
 #endif
 
+#include "flutter/shell/platform/linux/fl_view_private.h"
 #include "flutter/shell/platform/linux/public/flutter_linux/fl_dart_project.h"
 #include "flutter/shell/platform/linux/public/flutter_linux/fl_plugin_registry.h"
 #include "flutter/shell/platform/linux/public/flutter_linux/fl_view.h"
@@ -79,7 +80,8 @@ static void fl_application_activate(GApplication* application) {
   fl_dart_project_set_dart_entrypoint_arguments(
       project, priv->dart_entrypoint_arguments);
 
-  FlView* view = fl_view_new(project);
+  g_autoptr(FlEngine) engine = fl_engine_new(project);
+  FlView* view = fl_view_new_implicit(engine);
   gtk_widget_show(GTK_WIDGET(view));
 
   GtkWindow* window;

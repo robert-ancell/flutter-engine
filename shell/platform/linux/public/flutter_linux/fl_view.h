@@ -25,17 +25,7 @@ G_DECLARE_FINAL_TYPE(FlView, fl_view, FL, VIEW, GtkBox)
  *
  * #FlView is a GTK widget that is capable of displaying a Flutter application.
  *
- * The following example shows how to set up a view in a GTK application:
- * |[<!-- language="C" -->
- *   FlDartProject *project = fl_dart_project_new ();
- *   FlView *view = fl_view_new (project);
- *   gtk_widget_show (GTK_WIDGET (view));
- *   gtk_container_add (GTK_CONTAINER (parent), view);
- *
- *   FlBinaryMessenger *messenger =
- *     fl_engine_get_binary_messenger (fl_view_get_engine (view));
- *   setup_channels_or_plugins (messenger);
- * ]|
+ * Views are created by #FlApplication.
  */
 
 /**
@@ -45,6 +35,7 @@ G_DECLARE_FINAL_TYPE(FlView, fl_view, FL, VIEW, GtkBox)
  * Creates a widget to show a Flutter application.
  *
  * Returns: a new #FlView.
+ * Deprecated: Use FlApplication
  */
 FlView* fl_view_new(FlDartProject* project);
 
@@ -56,6 +47,7 @@ FlView* fl_view_new(FlDartProject* project);
  * The engine must be not be headless.
  *
  * Returns: a new #FlView.
+ * Deprecated: Use FlApplication
  */
 FlView* fl_view_new_for_engine(FlEngine* engine);
 

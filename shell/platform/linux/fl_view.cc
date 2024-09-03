@@ -705,11 +705,9 @@ static void fl_view_class_init(FlViewClass* klass) {
 }
 
 static void fl_view_init(FlView* self) {
-  gtk_widget_set_can_focus(GTK_WIDGET(self), TRUE);
+  self->view_id = -1;
 
-  // When we support multiple views this will become variable.
-  // https://github.com/flutter/flutter/issues/138178
-  self->view_id = flutter::kFlutterImplicitViewId;
+  gtk_widget_set_can_focus(GTK_WIDGET(self), TRUE);
 
   GdkRGBA default_background = {
       .red = 0.0, .green = 0.0, .blue = 0.0, .alpha = 1.0};
@@ -771,11 +769,13 @@ static void fl_view_init(FlView* self) {
 
 G_MODULE_EXPORT FlView* fl_view_new(FlDartProject* project) {
   g_autoptr(FlEngine) engine = fl_engine_new(project);
-  return fl_view_new_for_engine(engine);
+  return fl_view_new_implicit(engine);
 }
 
-G_MODULE_EXPORT FlView* fl_view_new_for_engine(FlEngine* engine) {
+FlView* fl_view_new2(FlEngine* engine, FlutterViewId view_id) {
   FlView* self = FL_VIEW(g_object_new(fl_view_get_type(), nullptr));
+
+  self->view_id = view_id;
 
   self->engine = FL_ENGINE(g_object_ref(engine));
   FlRenderer* renderer = fl_engine_get_renderer(engine);
@@ -788,6 +788,14 @@ G_MODULE_EXPORT FlView* fl_view_new_for_engine(FlEngine* engine) {
       self->engine, on_pre_engine_restart_cb, self, nullptr);
 
   return self;
+}
+
+G_MODULE_EXPORT FlView* fl_view_new_for_engine(FlEngine* engine) {
+  return fl_view_new_implicit(engine);
+}
+
+FlView* fl_view_new_implicit(FlEngine* engine) {
+  return fl_view_new2(engine, flutter::kFlutterImplicitViewId);
 }
 
 G_MODULE_EXPORT FlEngine* fl_view_get_engine(FlView* self) {

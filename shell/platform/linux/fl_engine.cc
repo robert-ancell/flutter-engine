@@ -69,7 +69,7 @@ G_DEFINE_QUARK(fl_engine_error_quark, fl_engine_error)
 static void fl_engine_plugin_registry_iface_init(
     FlPluginRegistryInterface* iface);
 
-enum { kSignalOnPreEngineRestart, kSignalLastSignal };
+enum { kSignalStarted, kSignalOnPreEngineRestart, kSignalLastSignal };
 
 static guint fl_engine_signals[kSignalLastSignal];
 
@@ -460,6 +460,9 @@ static void fl_engine_class_init(FlEngineClass* klass) {
           static_cast<GParamFlags>(G_PARAM_WRITABLE | G_PARAM_CONSTRUCT_ONLY |
                                    G_PARAM_STATIC_STRINGS)));
 
+  fl_engine_signals[kSignalStarted] =
+      g_signal_new("started", fl_engine_get_type(), G_SIGNAL_RUN_LAST, 0,
+                   nullptr, nullptr, nullptr, G_TYPE_NONE, 0);
   fl_engine_signals[kSignalOnPreEngineRestart] = g_signal_new(
       "on-pre-engine-restart", fl_engine_get_type(), G_SIGNAL_RUN_LAST, 0,
       nullptr, nullptr, nullptr, G_TYPE_NONE, 0);
@@ -631,6 +634,8 @@ gboolean fl_engine_start(FlEngine* self, GError** error) {
   if (result != kSuccess) {
     g_warning("Failed to notify display update to Flutter engine: %d", result);
   }
+
+  g_signal_emit(self, fl_engine_signals[kSignalStarted], 0);
 
   return TRUE;
 }

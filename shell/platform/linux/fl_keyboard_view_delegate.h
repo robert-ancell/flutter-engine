@@ -46,9 +46,6 @@ struct _FlKeyboardViewDelegateInterface {
 
   void (*redispatch_event)(FlKeyboardViewDelegate* delegate, FlKeyEvent* event);
 
-  guint (*lookup_key)(FlKeyboardViewDelegate* view_delegate,
-                      const GdkKeymapKey* key);
-
   GHashTable* (*get_keyboard_state)(FlKeyboardViewDelegate* delegate);
 };
 
@@ -101,9 +98,6 @@ FlBinaryMessenger* fl_keyboard_view_delegate_get_messenger(
 void fl_keyboard_view_delegate_redispatch_event(
     FlKeyboardViewDelegate* delegate,
     FlKeyEvent* event);
-
-guint fl_keyboard_view_delegate_lookup_key(FlKeyboardViewDelegate* delegate,
-                                           const GdkKeymapKey* key);
 
 /**
  * fl_keyboard_view_delegate_get_keyboard_state:

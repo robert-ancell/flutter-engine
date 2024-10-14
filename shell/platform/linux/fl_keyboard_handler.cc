@@ -17,10 +17,6 @@
 #include "flutter/shell/platform/linux/public/flutter_linux/fl_method_channel.h"
 #include "flutter/shell/platform/linux/public/flutter_linux/fl_standard_method_codec.h"
 
-// Turn on this flag to print complete layout data when switching IMEs. The data
-// is used in unit tests.
-#define DEBUG_PRINT_LAYOUT
-
 static constexpr char kChannelName[] = "flutter/keyboard";
 static constexpr char kGetKeyboardStateMethod[] = "getKeyboardState";
 
@@ -46,31 +42,6 @@ typedef struct {
 static bool is_eascii(uint16_t character) {
   return character < 256;
 }
-
-#ifdef DEBUG_PRINT_LAYOUT
-// Prints layout entries that will be parsed by `MockLayoutData`.
-void debug_format_layout_data(std::string& debug_layout_data,
-                              uint16_t keycode,
-                              uint16_t clue1,
-                              uint16_t clue2) {
-  if (keycode % 4 == 0) {
-    debug_layout_data.append("    ");
-  }
-
-  constexpr int kBufferSize = 30;
-  char buffer[kBufferSize];
-  buffer[0] = 0;
-  buffer[kBufferSize - 1] = 0;
-
-  snprintf(buffer, kBufferSize, "0x%04x, 0x%04x, ", clue1, clue2);
-  debug_layout_data.append(buffer);
-
-  if (keycode % 4 == 3) {
-    snprintf(buffer, kBufferSize, " // 0x%02x", keycode);
-    debug_layout_data.append(buffer);
-  }
-}
-#endif
 
 }  // namespace
 
@@ -168,11 +139,22 @@ struct _FlKeyboardHandler {
   std::unique_ptr<std::map<uint64_t, const LayoutGoal*>>
       logical_to_mandatory_goals;
 
+  // Current keymap in use.
+  GdkKeymap* keymap;
+
+  // Subscription to the keymap-keys-changed signal.
+  gulong keymap_keys_changed_cb_id;
+
   // The channel used by the framework to query the keyboard pressed state.
   FlMethodChannel* channel;
 };
 
 G_DEFINE_TYPE(FlKeyboardHandler, fl_keyboard_handler, G_TYPE_OBJECT);
+
+static void keymap_keys_changed_cb(FlKeyboardHandler* self) {
+  // FIXME: Can now be private?
+  fl_keyboard_handler_notify_layout_changed(self);
+}
 
 // This is an exact copy of g_ptr_array_find_with_equal_func.  Somehow CI
 // reports that can not find symbol g_ptr_array_find_with_equal_func, despite
@@ -283,13 +265,13 @@ static void responder_handle_event_callback(bool handled,
   }
 }
 
-static uint16_t convert_key_to_char(FlKeyboardViewDelegate* view_delegate,
+static uint16_t convert_key_to_char(FlKeyboardHandler* self,
                                     guint keycode,
                                     gint group,
                                     gint level) {
   GdkKeymapKey key = {keycode, group, level};
   constexpr int kBmpMax = 0xD7FF;
-  guint origin = fl_keyboard_view_delegate_lookup_key(view_delegate, &key);
+  guint origin = gdk_keymap_lookup_key(self->keymap, &key);
   return origin < kBmpMax ? origin : 0xFFFF;
 }
 
@@ -316,18 +298,6 @@ static void guarantee_layout(FlKeyboardHandler* self, FlKeyEvent* event) {
   std::map<uint64_t, const LayoutGoal*> remaining_mandatory_goals =
       *self->logical_to_mandatory_goals;
 
-#ifdef DEBUG_PRINT_LAYOUT
-  std::string debug_layout_data;
-  for (uint16_t keycode = 0; keycode < 128; keycode += 1) {
-    std::vector<uint16_t> this_key_clues = {
-        convert_key_to_char(view_delegate, keycode, group, 0),
-        convert_key_to_char(view_delegate, keycode, group, 1),  // Shift
-    };
-    debug_format_layout_data(debug_layout_data, keycode, this_key_clues[0],
-                             this_key_clues[1]);
-  }
-#endif
-
   // It's important to only traverse layout goals instead of all keycodes.
   // Some key codes outside of the standard keyboard also gives alpha-numeric
   // letters, and will therefore take over mandatory goals from standard
@@ -335,8 +305,8 @@ static void guarantee_layout(FlKeyboardHandler* self, FlKeyEvent* event) {
   for (const LayoutGoal& keycode_goal : layout_goals) {
     uint16_t keycode = keycode_goal.keycode;
     std::vector<uint16_t> this_key_clues = {
-        convert_key_to_char(view_delegate, keycode, group, 0),
-        convert_key_to_char(view_delegate, keycode, group, 1),  // Shift
+        convert_key_to_char(self, keycode, group, 0),
+        convert_key_to_char(self, keycode, group, 1),  // Shift
     };
 
     // The logical key should be the first available clue from below:
@@ -451,6 +421,11 @@ static void fl_keyboard_handler_dispose(GObject* object) {
   g_ptr_array_free(self->pending_redispatches, TRUE);
   g_clear_object(&self->derived_layout);
 
+  if (self->keymap_keys_changed_cb_id != 0) {
+    g_signal_handler_disconnect(self->keymap, self->keymap_keys_changed_cb_id);
+    self->keymap_keys_changed_cb_id = 0;
+  }
+
   G_OBJECT_CLASS(fl_keyboard_handler_parent_class)->dispose(object);
 }
 
@@ -478,6 +453,10 @@ static void fl_keyboard_handler_init(FlKeyboardHandler* self) {
   self->pending_redispatches = g_ptr_array_new_with_free_func(g_object_unref);
 
   self->last_sequence_id = 1;
+
+  self->keymap = gdk_keymap_get_for_display(gdk_display_get_default());
+  self->keymap_keys_changed_cb_id = g_signal_connect_swapped(
+      self->keymap, "keys-changed", G_CALLBACK(keymap_keys_changed_cb), self);
 }
 
 FlKeyboardHandler* fl_keyboard_handler_new(
